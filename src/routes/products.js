@@ -45,6 +45,11 @@ router.post("/:id/reserve", async (req, res) => {
       newInventory,
       id,
     ]);
+
+    console.log(
+      `Reservation successfully for product ${id}. New inventory: ${newInventory}`
+    );
+
     res.json({ message: "Reservation successfully", inventory: newInventory });
   } catch (err) {
     console.error(err);
