@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Product Reservation</title>
+    <link rel="stylesheet" href="../public/style.css" />
+
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      button {
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Product: <%= product.name %></h1>
+    <p>Description: <%= product.description %></p>
+    <p>Inventory: <span id="inventory"><%= product.inventory %></span></p>
+    <button onclick="reserveProduct('<%= product.id %>')">Reserve</button>
+    <p id="message"></p>
+
+    <script>
+      async function reserveProduct(id) {
+        try {
+          const response = await fetch(`/product/${id}/reserve`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          });
+          const data = await response.json();
+          if (response.ok) {
+            document.getElementById("inventory").textContent = data.inventory;
+            document.getElementById("message").textContent = data.message;
+          } else {
+            document.getElementById("message").textContent = data.error;
+          }
+        } catch (err) {
+          document.getElementById("message").textContent =
+            "Error reserving product";
+        }
+      }
+    </script>
+  </body>
+</html>
