@@ -1,6 +1,7 @@
 import express from "express";
 import redisService from "./service/redis.service.js";
 import productRouter from "./routes/products.js";
+import { syncInventoryToRedis } from "./db/sync-inventory.js";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -18,6 +19,7 @@ app.use(express.json());
 app.use("/product", productRouter);
 (async()=>{
   await  redisService.connect()
+  await syncInventoryToRedis()
   app.listen(port, () => {
     console.log(`Server running on http://localhost:${port}`);
   });

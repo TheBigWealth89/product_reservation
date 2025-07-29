@@ -12,7 +12,7 @@ class RedisService {
     this.client.on("connect", () => {
       console.log("✅ Connected to Redis successfully:", this.client.isOpen);
     });
-
+ 
     this.client.on("reconnecting", () => {
       console.warn("🔁 Reconnecting to Redis...");
     });
