@@ -2,6 +2,11 @@ import express from "express";
 import { pool } from "../db/index.js";
 import logger from "../utils/logger.js";
 import redisService from "../service/redis.service.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const router = express.Router();
 
 router.get("/:id", async (req, res) => {
@@ -24,31 +29,32 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+// Load the Lua script text when the module loads
+const luaScript = fs.readFileSync(
+  path.join(__dirname, "../../decrement_inventory.lua"),
+  "utf8"
+);
+
 router.post("/:id/reserve", async (req, res) => {
   try {
     const { id } = req.params;
     const key = `inventory:product-${id}`;
 
-    //Read inventory from redis
-    const inventory = await redisService.client.get(key);
-    if (inventory === null) {
-      return res.status(404).json({ error: "Product not found cache" });
-    }
+    const newInventory = await redisService.client.eval(luaScript, {
+      keys: [key],
+    });
 
-    //check inventory
-    const inventoryNum = parseInt(inventory, 10);
-    if (inventoryNum <= 0) {
+    if (newInventory < 0) {
       return res.status(400).json({ error: "Out of stock" });
     }
 
-    //Decrement inventory
-    const newInventory = await redisService.client.DECR(key);
-
-    //Save back to DB
-    await pool.query("UPDATE products SET inventory = $1 WHERE id = $2", [
-      newInventory,
-      id,
-    ]);
+    //Update the database 
+    pool
+      .query(
+        "UPDATE products SET inventory = inventory - 1 WHERE id = $1 AND inventory > 0",
+        [id]
+      )
+      .catch((err) => logger.error("Failed to sync inventory to DB:", err));
 
     logger.info(
       `Reservation successfully for product ${id}. New inventory: ${newInventory}`
@@ -56,7 +62,7 @@ router.post("/:id/reserve", async (req, res) => {
 
     res.json({ message: "Reservation successfully", inventory: newInventory });
   } catch (err) {
-    logger.error(err);
+    logger.error("Error in reservation:", err);
     res.status(500).json({ error: "server error" });
   }
 });
