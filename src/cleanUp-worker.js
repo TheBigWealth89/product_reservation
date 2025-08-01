@@ -17,17 +17,25 @@ const mainClient = createClient();
 
     // Check if it's a reservation key we care about
     if (key.startsWith("reservation:product-")) {
-      // Example key: "reservation:product-1:user-123"
+      // Key format is "reservation:product:{productId}:{userId}"
       const parts = key.split(":");
-      const productId = parts[2];
-      const inventoryKey = `inventory:product-${productId}`;
 
-      // Atomically increment the main inventory count to return the stock
-      const newInventory = await mainClient.incr(inventoryKey);
+      // The product ID is the THIRD part (index 2) of the key array
+      if (parts.length >= 3) {
+        const productId = parts[2];
+        const inventoryKey = `inventory:product-${productId}`;
 
-      logger.info(
-        `Stock returned for product ${productId}. New inventory: ${newInventory}`
-      );
+        // Atomically increment the correct inventory count to return the stock
+        const newInventory = await mainClient.incr(inventoryKey);
+
+        logger.info(
+          `Stock returned for product ${productId}. New inventory: ${newInventory}`
+        );
+      } else {
+        logger.warn(
+          `Could not parse a valid product ID from expired key: ${key}`
+        );
+      }
     }
   });
 })();
