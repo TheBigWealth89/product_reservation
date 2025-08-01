@@ -2,7 +2,7 @@
 
 A production grade system built with Node.js, PostgreSQL, and Redis to solve the "race condition" problem found in high-traffic e-commerce and booking platforms. This project demonstrates how to prevent overselling of limited-stock items during a flash sale, ensuring data consistency and a reliable user experience.
 
-![Architecture Diagram](src/assets/reservation_diagram.drawio.png)
+![Architecture Diagram](src/assets/reservation_diagram.drawi.png)
 
 ---
 
