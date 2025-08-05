@@ -41,11 +41,15 @@ router.post("/:id/reserve", async (req, res) => {
     // Assuming this would come from authentication section
     const userId = req.headers["x-user-id"] || "user-123";
     const key = `inventory:product-${id}`;
-    const reservationKey = `reservation:product-${id}:user-${userId}`;
+    // Reservation ID: Unique identifier for each reservation key. 
+    const reservationId = Date.now(); 
+    const reservationKey = `reservation:product:${id}:user-${userId}:${reservationId}`;
 
     const newInventory = await redisService.client.eval(luaScript, {
       keys: [key],
     });
+
+    console.log("New Inventory:", newInventory);
 
     if (newInventory < 0) {
       return res.status(400).json({ error: "Out of stock" });
@@ -79,7 +83,7 @@ router.post("/:id/purchase", async (req, res) => {
     const { id } = req.params;
     //Assuming this would come from authentication session
     const userId = req.headers["x-user-id"] || "user-123";
-    const reservationKey = `reservation:product-${id}:user-${userId}`;
+    const reservationKey = `reservation:product:${id}:user-${userId}`;
 
     //DEL command returns the number of keys deleted (1 if it existed, 0 if not).
     const keyDeleted = await redisService.client.del(reservationKey);
@@ -97,7 +101,6 @@ router.post("/:id/purchase", async (req, res) => {
       "UPDATE products SET inventory = inventory - 1 WHERE id = $1",
       [id]
     );
-
     logger.info(`Purchase confirmed for product ${id} by user ${userId}.`);
     res.status(200).json({ message: "Purchase successful!" });
   } catch (error) {

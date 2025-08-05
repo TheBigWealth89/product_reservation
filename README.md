@@ -57,8 +57,8 @@ This system prevents these issues by using Redis as a high-speed gatekeeper for 
 1.  **Clone the repository:**
 
     ```bash
-    git clone [https://github.com/](https://github.com/)[TheBigWealth89]/[product_reservation].git
-    cd [product_reservation]
+    git clone https://github.com/TheBigWealth89/product_reservation.git
+    cd product_reservation
     ```
 
 2.  **Install dependencies:**
