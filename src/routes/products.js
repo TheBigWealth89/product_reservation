@@ -95,7 +95,7 @@ router.post("/:id/purchase", async (req, res) => {
   try {
     const userId = req.headers["x-user-id"] || "user-123";
     const cartKey = `cart:user-${userId}`;
-    
+
     // Execute the checkout script in one single command, and handle it atomically
     const [successful, failed, debugLogs] = await redisService.client.eval(
       checkoutLuaScript,
@@ -124,17 +124,19 @@ router.post("/:id/purchase", async (req, res) => {
       for (const cartItem of successful) {
         const [productId] = cartItem.split(":");
         console.log("My purchase id:", productId);
-        // A. Decrement the main inventory
+
+        //Decrement the main inventory
         await client.query(
           "UPDATE products SET inventory = inventory - 1 WHERE id = $1 AND inventory > 0",
           [productId]
         );
 
+        // throw new Error("Simulating Database Crash");
+
         await client.query(
           "DELETE FROM reservations WHERE reservation_id = $1",
           [cartItem]
         );
-        console.log("Not a integer reserve:", cartItem);
       }
 
       await client.query("COMMIT");
@@ -146,14 +148,14 @@ router.post("/:id/purchase", async (req, res) => {
         e
       );
 
-      // --- COMPENSATION LOGIC STARTS HERE ---
+ 
       // If the DB fails, we must return the stock to Redis for the items
       // that were successfully validated by the Lua script.
       const multi = redisService.client.multi();
       for (const cartItem of successful) {
         const [productId] = cartItem.split(":");
         const inventoryKey = `inventory:product:${productId}`;
-        multi.incr(inventoryKey); // Queue up an INCR command for each failed item
+        multi.incr(inventoryKey); 
       }
       // Execute all INCR commands in a single batch
       await multi.exec();
@@ -161,7 +163,7 @@ router.post("/:id/purchase", async (req, res) => {
         `Stock returned to Redis for ${successful.length} items due to DB failure.`
       );
 
-      throw e; // Rethrow the original error
+      throw e; 
     } finally {
       client.release();
     }

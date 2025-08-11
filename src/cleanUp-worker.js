@@ -20,7 +20,7 @@ const mainClient = createClient();
       if (parts.length === 5) {
         const productId = parts[2];
         const userIdPart = parts[3];
-        const userId = userIdPart.replace("user-", "");
+        const userId = userIdPart.replace("user-", "");``
         const reservationId = parts[4].replace("rev-", "");
         const inventoryKey = `inventory:product-${productId}`;
         const cartKey = `cart:user-${userId}`;
