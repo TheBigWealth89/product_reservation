@@ -1,0 +1,49 @@
+-- Key for the user's cart 
+local cartKey = KEYS[1]
+-- The user ID, needed to build reservation keys
+local userId = ARGV[1]
+
+-- Get all items from the user's cart set
+local cartItems = redis.call('SMEMBERS', cartKey)
+local successfulPurchases = {}
+local failedPurchases = {}
+local debugLogs = {}
+
+-- Helper function to log both to Redis and to the debug log array
+local function log(msg)
+    table.insert(debugLogs, msg)
+    redis.log(redis.LOG_NOTICE, msg)
+end
+
+-- Loop through each item in the cart
+for i, cartItem in ipairs(cartItems) do
+    log('Processing cart item: ' .. cartItem)
+
+    -- Parse the productId and reservationId from the cart item string
+   local productId, reservationId = string.match(cartItem, "^(%d+):rev%-([%w%-]+)$")
+    log("Parsed productId: " .. tostring(productId))
+    log("Parsed reservationId: " .. tostring(reservationId))
+
+    if productId and reservationId then
+        -- Construct the full reservation key
+        local reservationKey = 'reservation:product:' .. productId .. ':user-' .. userId .. ':rev-' .. reservationId
+        log('Looking for key: ' .. reservationKey)
+
+        -- Atomically check and delete the reservation key
+        local keysDeleted = redis.call('DEL', reservationKey)
+        log('Keys deleted: ' .. tostring(keysDeleted))
+
+        if keysDeleted > 0 then
+            table.insert(successfulPurchases, cartItem)
+            redis.call('SREM', cartKey, cartItem)
+        else
+            table.insert(failedPurchases, cartItem)
+            redis.call('SREM', cartKey, cartItem)
+        end
+    else
+        log('Item parsing failed: ' .. cartItem)
+    end
+end
+
+-- Return the two lists of successful and failed items, plus logs
+return {successfulPurchases, failedPurchases, debugLogs}

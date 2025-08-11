@@ -1,6 +1,6 @@
 import { createClient } from "redis";
 import logger from "./utils/logger.js";
-
+import { pool } from "./db/index.js";
 const subscriber = createClient();
 const mainClient = createClient();
 
@@ -25,6 +25,15 @@ const mainClient = createClient();
         const inventoryKey = `inventory:product-${productId}`;
         const cartKey = `cart:user-${userId}`;
         const cartItem = `${productId}:rev-${reservationId}`;
+
+        // Also delete the durable reservation from PostgreSQL
+        await pool.query(
+          "DELETE FROM reservations WHERE product_id = $1 AND user_id = $2",
+          [productId, userId]
+        );
+        logger.info(
+          `Reservation deleted for product ${productId} and user ${userId}`
+        );
         // Return stock
         const newInventory = await mainClient.incr(inventoryKey);
         logger.info(`Stock returned for product ${productId}.`);

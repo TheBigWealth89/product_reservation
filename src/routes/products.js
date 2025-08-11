@@ -2,6 +2,7 @@ import express from "express";
 import { pool } from "../db/index.js";
 import logger from "../utils/logger.js";
 import redisService from "../service/redis.service.js";
+import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -9,6 +10,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const router = express.Router();
 
+// Load the Lua script text when the module loads
+const reserveLuaScript = fs.readFileSync(
+  path.join(__dirname, "../../decrement_inventory.lua"),
+  "utf8"
+);
+const checkoutLuaScript = fs.readFileSync(
+  path.join(__dirname, "../../checkout.lua"),
+  "utf8"
+);
 router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -29,22 +39,15 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// Load the Lua script text when the module loads
-const luaScript = fs.readFileSync(
-  path.join(__dirname, "../../decrement_inventory.lua"),
-  "utf8"
-);
-
 router.post("/:id/reserve", async (req, res) => {
   try {
     const { id } = req.params;
-
     // Assuming this would come from authentication section
     const userId = req.headers["x-user-id"] || "user-123";
     const key = `inventory:product-${id}`;
     const cartKey = `cart:user-${userId}`;
 
-    const newInventory = await redisService.client.eval(luaScript, {
+    const newInventory = await redisService.client.eval(reserveLuaScript, {
       keys: [key],
     });
 
@@ -52,22 +55,28 @@ router.post("/:id/reserve", async (req, res) => {
       return res.status(400).json({ error: "Out of stock" });
     }
 
+    const reservationId = uuidv4();
+    const cartEntry = `${id}:rev-${reservationId}`;
+
+    const tenMinutesFromNow = new Date(Date.now() + 10000);
+    await pool.query(
+      "INSERT INTO reservations (product_id, user_id, expires_at, reservation_id) VALUES ($1, $2, $3, $4)",
+      [id, userId, tenMinutesFromNow, cartEntry]
+    );
+
     // This create a temporary reservation key for this user with a 10-minute TTL (600 seconds)
     // SETEX is atomic, so the key is created and its expiration is set in one command.
-    const reservationId = Date.now();
     const reservationKey = `reservation:product:${id}:user-${userId}:rev-${reservationId}`;
-    console.log("First key:", reservationKey);
-    await redisService.client.setEx(reservationKey, 5, "reserved");
+    await redisService.client.setEx(reservationKey, 10, "reserved");
 
     // Add productId to user's cart in Redis Set
-    const cartEntry = `${id}:rev-${reservationId}`;
     await redisService.client.sAdd(cartKey, cartEntry);
     logger.info(
       `Product ${id} reserved for user ${userId}. Hold expires in 10 minutes.`
     );
 
     logger.info(
-      `Reservation successfully for product ${id}. New inventory: ${newInventory}a`
+      `Reservation successfully for product ${id}. New inventory: ${newInventory}`
     );
 
     res.json({
@@ -86,77 +95,83 @@ router.post("/:id/purchase", async (req, res) => {
   try {
     const userId = req.headers["x-user-id"] || "user-123";
     const cartKey = `cart:user-${userId}`;
-
-    // Get all items in user's cart
-    let cartItems = await redisService.client.sMembers(cartKey);
-    logger.info(`Full cart items ${cartItems}`)
-
-    if (cartItems.length === 0) {
-      return res.status(400).json({ error: "Your cart is empty." });
-    }
-
-    // Failsafe Cleanup: Remove expired reservations from cart
-    for (const cartItem of cartItems) {
-      const [productId, reservationId] = cartItem.split(":rev-");
-      const reservationKey = `reservation:product:${productId}:user-${userId}:rev-${reservationId}`;
-
-      const reservationExists = await redisService.client.exists(
-        reservationKey
-      );
-
-      if (reservationExists === 0) {
-        console.log(`Removing expired reservation from cart: ${cartItem}`);
-        await redisService.client.sRem(cartKey, cartItem);
+    
+    // Execute the checkout script in one single command, and handle it atomically
+    const [successful, failed, debugLogs] = await redisService.client.eval(
+      checkoutLuaScript,
+      {
+        keys: [cartKey],
+        arguments: [userId],
       }
+    );
+
+    console.log("Lua Debug Logs:");
+    console.log(debugLogs.join("\n"));
+
+    if (successful.length === 0) {
+      return res.status(400).json({
+        message: "Checkout failed. No valid reservations found.",
+        successful_purchases: [],
+        expired_or_invalid: failed,
+      });
     }
 
-    // Refresh cart after cleanup
-    cartItems = await redisService.client.sMembers(cartKey);
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    if (cartItems.length === 0) {
-      return res
-        .status(400)
-        .json({ error: "No active reservations found. Please reserve again." });
-    }
+      // Loop through only the items that were successfully validated by Redis
+      for (const cartItem of successful) {
+        const [productId] = cartItem.split(":");
+        console.log("My purchase id:", productId);
+        // A. Decrement the main inventory
+        await client.query(
+          "UPDATE products SET inventory = inventory - 1 WHERE id = $1 AND inventory > 0",
+          [productId]
+        );
 
-    let failedPurchases = [];
-    let successfulPurchases = [];
-
-    // Process Valid Reservations
-    for (const cartItem of cartItems) {
-      const [productId, reservationId] = cartItem.split(":rev-");
-      const reservationKey = `reservation:product:${productId}:user-${userId}:rev-${reservationId}`;
-
-      const reservationExists = await redisService.client.exists(
-        reservationKey
-      );
-
-      if (reservationExists === 0) {
-        // Should not happen after cleanup but just in case
-        failedPurchases.push(cartItem);
-        continue;
+        await client.query(
+          "DELETE FROM reservations WHERE reservation_id = $1",
+          [cartItem]
+        );
+        console.log("Not a integer reserve:", cartItem);
       }
 
-      // Proceed with DB Update (Source of Truth)
-      await pool.query(
-        "UPDATE products SET inventory = inventory - 1 WHERE id = $1",
-        [productId]
+      await client.query("COMMIT");
+      logger.info(`Successfully processed checkout for user ${userId}.`);
+    } catch (e) {
+      await client.query("ROLLBACK");
+      logger.error(
+        "Database transaction failed. Initiating compensation logic.",
+        e
       );
 
-      // Remove reservation and cart entry
-      await redisService.client.del(reservationKey);
-      await redisService.client.sRem(cartKey, cartItem);
+      // --- COMPENSATION LOGIC STARTS HERE ---
+      // If the DB fails, we must return the stock to Redis for the items
+      // that were successfully validated by the Lua script.
+      const multi = redisService.client.multi();
+      for (const cartItem of successful) {
+        const [productId] = cartItem.split(":");
+        const inventoryKey = `inventory:product:${productId}`;
+        multi.incr(inventoryKey); // Queue up an INCR command for each failed item
+      }
+      // Execute all INCR commands in a single batch
+      await multi.exec();
+      logger.info(
+        `Stock returned to Redis for ${successful.length} items due to DB failure.`
+      );
 
-      successfulPurchases.push(cartItem);
+      throw e; // Rethrow the original error
+    } finally {
+      client.release();
     }
-
     res.json({
       message: "Checkout complete.",
-      successful: successfulPurchases,
-      failed: failedPurchases,
+      successful: successful,
+      failed: failed,
     });
   } catch (err) {
-    logger.error("Error in purchase:", err);
+    logger.error("Error in checkout:", err);
     res.status(500).json({ error: "server error" });
   }
 });
