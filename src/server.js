@@ -1,7 +1,8 @@
 import express from "express";
-import redisService from "./service/redis.service.js";
+import { connectAll } from "./connections.js";
 import productRouter from "./routes/products.js";
 import { syncInventoryToRedis } from "./db/sync-inventory.js";
+import logger from "./utils/logger.js";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -19,10 +20,15 @@ app.set("views", path.join(__dirname, "views"));
 // app.use(express.static("public")); // Serve static files
 
 app.use("/product", productRouter);
-(async () => {
-  await redisService.connect();
-  await syncInventoryToRedis();
-  app.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}`);
+connectAll()
+  .then(async () => {
+    await syncInventoryToRedis();
+   
+    app.listen(port, () => {
+      logger.info(`Server running on port 3000`);
+    });
+  })
+  .catch((err) => {
+    logger.error("💥 Failed to start server:", err);
+    process.exit(1);
   });
-})();

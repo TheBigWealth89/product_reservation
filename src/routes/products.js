@@ -1,7 +1,7 @@
 import express from "express";
-import { pool } from "../db/index.js";
+import { redisClient, pool } from "../connections.js";
 import logger from "../utils/logger.js";
-import redisService from "../service/redis.service.js";
+import purchaseQueue from "../queues/purchaseQueue.js";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
 import path from "path";
@@ -30,7 +30,7 @@ router.get("/:id", async (req, res) => {
     }
     const product = result.rows[0];
     // Get inventory from Redis for consistency in UI
-    const inventory = await redisService.client.get(`inventory:product-${id}`);
+    const inventory = await redisClient.get(`inventory:product-${id}`);
     product.inventory = parseInt(inventory, 10) || product.inventory;
     res.render("product", { product });
   } catch (err) {
@@ -44,33 +44,37 @@ router.post("/:id/reserve", async (req, res) => {
     const { id } = req.params;
     // Assuming this would come from authentication section
     const userId = req.headers["x-user-id"] || "user-123";
-    const key = `inventory:product-${id}`;
+    const inventoryKey = `inventory:product-${id}`;
     const cartKey = `cart:user-${userId}`;
 
-    const newInventory = await redisService.client.eval(reserveLuaScript, {
-      keys: [key],
+    // Run atomic Lua script to decrement inventory
+    const newInventory = await redisClient.eval(reserveLuaScript, {
+      keys: [inventoryKey],
     });
 
     if (newInventory < 0) {
       return res.status(400).json({ error: "Out of stock" });
     }
 
+    // Generate clean reservation ID
     const reservationId = uuidv4();
     const cartEntry = `${id}:rev-${reservationId}`;
+    console.log("My cartEntry:", cartEntry);
+    const reservationKey = `reservation:product:${id}:user-${userId}:rev-${reservationId}`;
 
-    const tenMinutesFromNow = new Date(Date.now() + 10000);
+    const tenMinutesFromNow = new Date(Date.now() + 60000);
+
+    //Save to DB
     await pool.query(
       "INSERT INTO reservations (product_id, user_id, expires_at, reservation_id) VALUES ($1, $2, $3, $4)",
       [id, userId, tenMinutesFromNow, cartEntry]
     );
 
-    // This create a temporary reservation key for this user with a 10-minute TTL (600 seconds)
-    // SETEX is atomic, so the key is created and its expiration is set in one command.
-    const reservationKey = `reservation:product:${id}:user-${userId}:rev-${reservationId}`;
-    await redisService.client.setEx(reservationKey, 10, "reserved");
+    // Set Redis reservation key with TTL
+    await redisClient.setEx(reservationKey, 600, "reserved");
 
-    // Add productId to user's cart in Redis Set
-    await redisService.client.sAdd(cartKey, cartEntry);
+    // Add product to user's cart in Redis Set
+    await redisClient.sAdd(cartKey, cartEntry);
     logger.info(
       `Product ${id} reserved for user ${userId}. Hold expires in 10 minutes.`
     );
@@ -84,6 +88,7 @@ router.post("/:id/reserve", async (req, res) => {
       inventory: newInventory,
       reservationKey: reservationKey,
       // reservationId: reservationId,
+      expiredAt: tenMinutesFromNow,
     });
   } catch (err) {
     logger.error("Error in reservation:", err);
@@ -97,7 +102,7 @@ router.post("/:id/purchase", async (req, res) => {
     const cartKey = `cart:user-${userId}`;
 
     // Execute the checkout script in one single command, and handle it atomically
-    const [successful, failed, debugLogs] = await redisService.client.eval(
+    const [successful, failed, debugLogs] = await redisClient.eval(
       checkoutLuaScript,
       {
         keys: [cartKey],
@@ -116,62 +121,29 @@ router.post("/:id/purchase", async (req, res) => {
       });
     }
 
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
-
-      // Loop through only the items that were successfully validated by Redis
-      for (const cartItem of successful) {
-        const [productId] = cartItem.split(":");
-        console.log("My purchase id:", productId);
-
-        //Decrement the main inventory
-        await client.query(
-          "UPDATE products SET inventory = inventory - 1 WHERE id = $1 AND inventory > 0",
-          [productId]
-        );
-
-        // throw new Error("Simulating Database Crash");
-
-        await client.query(
-          "DELETE FROM reservations WHERE reservation_id = $1",
-          [cartItem]
-        );
-      }
-
-      await client.query("COMMIT");
-      logger.info(`Successfully processed checkout for user ${userId}.`);
-    } catch (e) {
-      await client.query("ROLLBACK");
-      logger.error(
-        "Database transaction failed. Initiating compensation logic.",
-        e
+    if (successful.length > 0) {
+      const job = await purchaseQueue.add(
+        "process-purchase",
+        {
+          successfulItems: successful,
+          userId: userId,
+        },
+        {
+          attempts: 3,
+          backoff: {
+            type: "fixed",
+            delay: 1000,
+          },
+          removeOnComplete: true,
+          removeOnFail: false,
+        }
       );
-
- 
-      // If the DB fails, we must return the stock to Redis for the items
-      // that were successfully validated by the Lua script.
-      const multi = redisService.client.multi();
-      for (const cartItem of successful) {
-        const [productId] = cartItem.split(":");
-        const inventoryKey = `inventory:product:${productId}`;
-        multi.incr(inventoryKey); 
-      }
-      // Execute all INCR commands in a single batch
-      await multi.exec();
-      logger.info(
-        `Stock returned to Redis for ${successful.length} items due to DB failure.`
-      );
-
-      throw e; 
-    } finally {
-      client.release();
+      logger.info(`processed order added to queue for user ${userId}.`);
+      res.status(202).json({
+        message: "Checkout accepted. Your order is being processed.",
+        jobId: job.id,
+      });
     }
-    res.json({
-      message: "Checkout complete.",
-      successful: successful,
-      failed: failed,
-    });
   } catch (err) {
     logger.error("Error in checkout:", err);
     res.status(500).json({ error: "server error" });

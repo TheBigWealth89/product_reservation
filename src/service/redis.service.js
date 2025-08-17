@@ -1,8 +1,8 @@
 import { createClient } from "redis";
+export const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
 
 class RedisService {
   constructor() {
-    const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
     this.client = createClient({ url: redisUrl });
 
     // This is a separate client dedicated to monitoring
@@ -25,19 +25,19 @@ class RedisService {
     if (!this.client.isOpen) {
       await this.client.connect();
     }
-    if (!this.monitorClient.isOpen) {
-      await this.monitorClient.connect();
-      this.monitorClient.monitor((err, monitor) => {
-        if (err) {
-          console.error("Redis Monitor Error:", err);
-          return;
-        }
-        monitor.on("monitor", (time, args, raw_reply) => {
-          console.log(`[REDIS COMMAND] ${time} :${args.join(" ")}`);
-        });
-        console.log("🕵️  Redis monitor started.");
-      });
-    }
+    // if (!this.monitorClient.isOpen) {
+    //   await this.monitorClient.connect();
+    //   this.monitorClient.monitor((err, monitor) => {
+    //     if (err) {
+    //       console.error("Redis Monitor Error:", err);
+    //       return;
+    //     }
+    //     monitor.on("monitor", (time, args, raw_reply) => {
+    //       console.log(`[REDIS COMMAND] ${time} :${args.join(" ")}`);
+    //     });
+    //     console.log("🕵️  Redis monitor started.");
+    //   });
+    // }
   }
 }
 

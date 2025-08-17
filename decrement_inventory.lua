@@ -12,4 +12,4 @@ if current_stock and current_stock > 0 then
 else
   -- If no, return -1 to signal it's out of stock
   return -1
-end
+end 
