@@ -1,5 +1,5 @@
 import express from "express";
-import { redisClient, pool } from "../connections.js";
+import { redisClient, pool } from "../db/connections.js";
 import logger from "../utils/logger.js";
 import purchaseQueue from "../queues/purchaseQueue.js";
 import { v4 as uuidv4 } from "uuid";
@@ -43,7 +43,7 @@ router.post("/:id/reserve", async (req, res) => {
   try {
     const { id } = req.params;
     // Assuming this would come from authentication section
-    const userId = req.headers["x-user-id"] || "user-123";
+    const userId = req.headers["x-user-id"] || "user-1234";
     const inventoryKey = `inventory:product-${id}`;
     const cartKey = `cart:user-${userId}`;
 
@@ -52,6 +52,7 @@ router.post("/:id/reserve", async (req, res) => {
       keys: [inventoryKey],
     });
 
+    console.log(newInventory);
     if (newInventory < 0) {
       return res.status(400).json({ error: "Out of stock" });
     }
@@ -98,7 +99,7 @@ router.post("/:id/reserve", async (req, res) => {
 
 router.post("/:id/purchase", async (req, res) => {
   try {
-    const userId = req.headers["x-user-id"] || "user-123";
+    const userId = req.headers["x-user-id"] || "user-1234";
     const cartKey = `cart:user-${userId}`;
 
     // Execute the checkout script in one single command, and handle it atomically

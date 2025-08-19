@@ -1,5 +1,4 @@
-import { pool } from "../connections.js";
-import { redisClient } from "../connections.js";
+import { redisClient, pool } from "./connections.js";
 import logger from "../utils/logger.js";
 import purchaseQueue from "../queues/purchaseQueue.js";
 

@@ -1,6 +1,6 @@
 import { createClient } from "redis";
 import logger from "../utils/logger.js";
-import { pool } from "../connections.js";
+import { pool } from "../db/connections.js";
 const subscriber = createClient();
 const mainClient = createClient();
 
@@ -28,13 +28,13 @@ const mainClient = createClient();
         const cartItem = `${productId}:rev-${reservationId}`;
 
         try {
-          // Update DB status instead of deleting row
+          // Update DB status
           const result = await pool.query(
             `UPDATE reservations 
             SET status = 'expired', updated_at = NOW() 
             WHERE product_id = $1 AND user_id = $2 AND   reservation_id = $3 AND status = 'pending'`,
             [productId, userId, cartItem]
-          );  
+          );
 
           if (result.rowCount > 0) {
             logger.info(

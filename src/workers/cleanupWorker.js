@@ -1,6 +1,5 @@
 import { Queue, Worker } from "bullmq";
-import { redisUrl } from "../service/redis.service.js";
-import { redisClient, connectAll, pool } from "../connections.js";
+import { redisClient, connectAll, pool } from "../db/connections.js";
 import logger from "../utils/logger.js";
 import purchaseQueue from "../queues/purchaseQueue.js";
 import cron from "node-cron";
@@ -10,7 +9,7 @@ async function initialize() {
 
   // Initialize cleanup queue
   const cleanupQueue = new Queue("cleanup", {
-    connection: { url: redisUrl },
+    connection: { redisClient },
   });
 
   // Create worker with verbose logging
@@ -40,6 +39,23 @@ async function initialize() {
           // Process each item
           for (const cartItem of job.data?.successfulItems || []) {
             logger.info(`🛠️ Processing item: ${cartItem}`);
+
+            // Before doing anything, check if this reservation has already been cancelled.
+            const checkResult = await client.query(
+              "SELECT status FROM reservations WHERE reservation_id = $1",
+              [cartItem]
+            );
+
+            if (
+              checkResult.rows.length > 0 &&
+              checkResult.rows[0].status === "cancelled"
+            ) {
+              logger.warn(
+                `Job ${job.id}: Reservation ${cartItem} already cancelled. Skipping.`
+              );
+              // Continue to the next item in the cart
+              continue;
+            }
 
             const [productId] = cartItem.split(":");
 
@@ -71,7 +87,7 @@ async function initialize() {
       }
     },
     {
-      connection: { url: redisUrl },
+      connection: { redisClient },
       limiter: {
         max: 1,
         duration: 1000,
@@ -79,9 +95,11 @@ async function initialize() {
     }
   );
 
-  const testSchedule = "*/20 * * * * *"; // 6-part format for seconds
-  logger.info(`Setting up test schedule: ${testSchedule}`);
-  cron.schedule(testSchedule, () => {
+  // const testSchedule = "*/20 * * * * *";
+  // const fiveMinutes = "*/5 * * * *";
+  const threeHrs = "0 */3 * * *";
+  logger.info(`Setting up test schedule: ${threeHrs}`);
+  cron.schedule(threeHrs, () => {
     logger.info("⏰ Triggering scheduled cleanup");
     cleanupQueue.add("cleanup", {});
   });

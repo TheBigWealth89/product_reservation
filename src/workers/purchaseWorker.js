@@ -1,10 +1,14 @@
 import { Worker } from "bullmq";
-import { redisUrl, pool } from "../service/redis.service.js";
+import { redisClient, pool } from "../db/connections.js";
 import logger from "../utils/logger.js";
 
 new Worker(
   "purchase-processing",
   async (job) => {
+    if (job.data.userId === "failing-user") {
+      logger.warn(`Job ${job.id}: Simulating failure for user 'failing-user'.`);
+      throw new Error("Simulated payment gateway failure.");
+    }
     let client;
     try {
       const { successfulItems, userId } = job.data;
@@ -15,7 +19,8 @@ new Worker(
 
       for (const cartItem of successfulItems) {
         const [productId] = cartItem.split(":");
-
+        const delay = (ms) => new Promise((res) => setTimeout(res, ms));
+        await delay(Math.random() * 2000);
         // Before doing anything, check if this reservation has already been completed.
         const checkResult = await client.query(
           "SELECT status FROM reservations WHERE reservation_id = $1",
@@ -43,7 +48,7 @@ new Worker(
           throw new Error(`Product ${productId} out of stock`);
         }
 
-        throw new Error("Server crashed");
+        // throw new Error("Server crashed");
 
         if (result.rowCount > 0) {
           await client.query(
@@ -73,7 +78,7 @@ new Worker(
       client.release();
     }
   },
-  { connection: { url: redisUrl } }
+  { connection: { redisClient } }
 );
 
 logger.info("Database worker started and listening for jobs.");
