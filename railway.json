@@ -1,0 +1,30 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS"
+  },
+  "deploy": {
+    "startCommand": "npm run start",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  },
+  "services": {
+    "web": {
+      "startCommand": "npm run start",
+      "healthcheckPath": "/",
+      "healthcheckTimeout": 100
+    },
+    "purchase-worker": {
+      "startCommand": "npm run start:purchaseWorker",
+      "healthcheckPath": null
+    },
+    "expires-worker": {
+      "startCommand": "npm run start:expiresWorker",
+      "healthcheckPath": null
+    },
+    "cleanup-worker": {
+      "startCommand": "npm run start:cleanupWorker",
+      "healthcheckPath": null
+    }
+  }
+}
