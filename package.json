@@ -23,6 +23,7 @@
   "description": "",
   "dependencies": {
     "bullmq": "^5.56.10",
+    "connect-redis": "^9.0.0",
     "dotenv": "^17.2.0",
     "ejs": "^3.1.10",
     "express": "^5.1.0",
