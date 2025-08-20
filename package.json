@@ -13,6 +13,9 @@
     "dev:cleanupWorker": "cross-env NODE_ENV=development node src/workers/cleanupWorker.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "engines": {
+    "node": ">=20"
+  },
   "type": "module",
   "keywords": [],
   "author": "",
