@@ -1,0 +1,58 @@
+# This is the blueprint for deploying your application on Render.
+
+services:
+  # 1. The main API Server (Web Service)
+  - type: web
+    name: my-app-api
+    env: node
+    buildCommand: npm install
+    startCommand: npm run start
+    envVars:
+      - key: DATABASE_URL
+        value: "postgresql://product_reservation_db_user:1qUi5cGvzHlOZsVn6wmfkOZIuRE1fmP7@dpg-d2ib7t0gjchc73e9f7k0-a/product_reservation_db"
+      - key: REDIS_URL
+        value: "redis://red-d2iv2t6r433s73e9ql8g:6379"
+      - key: NODE_ENV
+        value: production
+
+  # 2. The Purchase Worker (Background Worker)
+  - type: worker
+    name: purchase-worker
+    env: node
+    buildCommand: npm install
+    startCommand: npm run start:purchaseWorker
+    envVars:
+      - key: DATABASE_URL
+        value: "postgresql://product_reservation_db_user:1qUi5cGvzHlOZsVn6wmfkOZIuRE1fmP7@dpg-d2ib7t0gjchc73e9f7k0-a/product_reservation_db"
+      - key: REDIS_URL
+        value: "redis://red-d2iv2t6r433s73e9ql8g:6379"
+      - key: NODE_ENV
+        value: production
+
+  # 3. The Expires Worker (Background Worker)
+  - type: worker
+    name: expires-worker
+    env: node
+    buildCommand: npm install
+    startCommand: npm run start:expiresWorker
+    envVars:
+      - key: DATABASE_URL
+        value: "postgresql://product_reservation_db_user:1qUi5cGvzHlOZsVn6wmfkOZIuRE1fmP7@dpg-d2ib7t0gjchc73e9f7k0-a/product_reservation_db"
+      - key: REDIS_URL
+        value: "redis://red-d2iv2t6r433s73e9ql8g:6379"
+      - key: NODE_ENV
+        value: production
+
+  # 4. The Cleanup Worker (Background Worker)
+  - type: worker
+    name: cleanup-worker
+    env: node
+    buildCommand: npm install
+    startCommand: npm run start:cleanupWorker
+    envVars:
+      - key: DATABASE_URL
+        value: "postgresql://product_reservation_db_user:1qUi5cGvzHlOZsVn6wmfkOZIuRE1fmP7@dpg-d2ib7t0gjchc73e9f7k0-a/product_reservation_db"
+      - key: REDIS_URL
+        value: "redis://red-d2iv2t6r433s73e9ql8g:6379"
+      - key: NODE_ENV
+        value: production
