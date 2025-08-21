@@ -44,7 +44,7 @@ export const syncInventoryToRedis = async () => {
 
       const activeReservations = parseInt(reservationResult.rows[0].count, 10);
       const activeInQueue = queuedItemsCount[product.id] || 0;
-      console.log("Queue count: ", activeInQueue);
+      logger.info("Queue count: ", activeInQueue);
 
       // Calculate the true available inventory
       const availableInventory = Math.max(

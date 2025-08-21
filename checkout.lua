@@ -35,10 +35,10 @@ for i, cartItem in ipairs(cartItems) do
 
         if keysDeleted > 0 then
             table.insert(successfulPurchases, cartItem)
-            redis.call('SREM', cartKey, cartItem)
+            redis.call('srem', cartKey, cartItem)
         else
             table.insert(failedPurchases, cartItem)
-            redis.call('SREM', cartKey, cartItem)
+            redis.call('srem', cartKey, cartItem)
         end
     else
         log('Item parsing failed: ' .. cartItem)
@@ -47,3 +47,4 @@ end
 
 -- Return the two lists of successful and failed items, plus logs
 return {successfulPurchases, failedPurchases, debugLogs}
+    

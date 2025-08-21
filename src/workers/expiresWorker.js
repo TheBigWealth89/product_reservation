@@ -1,68 +1,73 @@
-import { createClient } from "redis";
+import { pool, redisClient } from "../db/connections.js";
 import logger from "../utils/logger.js";
-import { pool } from "../db/connections.js";
-const subscriber = createClient();
-const mainClient = createClient();
 
-(async () => {
-  await subscriber.connect();
-  await mainClient.connect();
-  logger.info(
-    "Cleanup worker connected to Redis and listening for expired keys."
-  );
-  // Subscribe to the keyspace channel for expired events
-  await subscriber.subscribe("__keyevent@0__:expired", async (key) => {
-    logger.info(`Expired key detected: ${key}`);
-    // Check if it's a reservation key we care about
-    if (key.startsWith("reservation:product")) {
-      const parts = key.split(":");
-      console.log(parts);
-      if (parts.length === 5) {
-        const productId = parts[2];
-        const userIdPart = parts[3];
-        const userId = userIdPart.replace("user-", "");
-        const reservationId = parts[4].replace("rev-", "");
-        console.log("reservation id:", reservationId);
-        const inventoryKey = `inventory:product-${productId}`;
-        const cartKey = `cart:user-${userId}`;
-        const cartItem = `${productId}:rev-${reservationId}`;
+class ExpirationCleanup {
+  constructor() {
+    this.isRunning = false;
+    this.interval = 30000; // 30 seconds
+  }
 
+  async cleanupExpired() {
+    if (this.isRunning) return;
+    this.isRunning = true;
+
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+
+      // Find expired reservations
+      const expired = await client.query(`
+        SELECT * FROM reservations 
+        WHERE expires_at < NOW() 
+        AND status = 'pending'
+        FOR UPDATE SKIP LOCKED
+      `);
+
+      for (const reservation of expired.rows) {
         try {
-          // Update DB status
-          const result = await pool.query(
-            `UPDATE reservations 
-            SET status = 'expired', updated_at = NOW() 
-            WHERE product_id = $1 AND user_id = $2 AND   reservation_id = $3 AND status = 'pending'`,
-            [productId, userId, cartItem]
+          // Update status
+          await client.query(
+            `UPDATE reservations SET status = 'expired' WHERE id = $1`,
+            [reservation.id]
           );
 
-          if (result.rowCount > 0) {
-            logger.info(
-              `Reservation ${reservationId} marked as expired for product ${productId}, user ${userId}`
-            );
+          // Restore inventory
+          await redisClient.incr(`inventory:product-${reservation.product_id}`);
 
-            // Return stock to Redis
-            const newInventory = await mainClient.incr(inventoryKey);
-            logger.info(
-              `Stock returned for product ${productId}, new inventory: ${newInventory}`
-            );
+          // Remove from cart
+          await redisClient.srem(
+            `cart:user-${reservation.user_id}`, 
+            reservation.reservation_id
+          );
 
-            logger.info(`New inventory ${newInventory}`);
-
-            // Remove from user's cart
-            await mainClient.sRem(cartKey, cartItem);
-            logger.info(
-              `Product ${cartItem} removed from cart of user ${userId}`
-            );
-          } else {
-            logger.info(
-              `Reservation ${reservationId} was already completed or not found`
-            );
-          }
+          logger.info(`Cleaned expired reservation: ${reservation.reservation_id}`);
         } catch (err) {
-          logger.error(`Error processing expired reservation: ${err.message}`);
+          logger.error(`Failed to clean reservation ${reservation.id}:`, err);
+          // Continue with other reservations
         }
       }
+
+      await client.query('COMMIT');
+      
+    } catch (err) {
+      await client.query('ROLLBACK');
+      logger.error('Cleanup transaction failed:', err);
+    } finally {
+      client.release();
+      this.isRunning = false;
     }
-  });
-})();
+  }
+
+  start() {
+    logger.info('🔄 Starting expiration cleanup worker (30s interval)');
+    setInterval(() => this.cleanupExpired(), this.interval);
+    this.cleanupExpired(); // Run immediately
+  }
+}
+
+// Start the cleanup
+const cleanup = new ExpirationCleanup();
+cleanup.start();
+
+export default cleanup;

@@ -34,7 +34,7 @@ router.get("/:id", async (req, res) => {
     product.inventory = parseInt(inventory, 10) || product.inventory;
     res.render("product", { product });
   } catch (err) {
-    console.error(err);
+    logger.error(`Error to get reservations ${err}`);
     res.status(500).send("Server error");
   }
 });
@@ -46,13 +46,14 @@ router.post("/:id/reserve", async (req, res) => {
     const userId = req.headers["x-user-id"] || "user-1234";
     const inventoryKey = `inventory:product-${id}`;
     const cartKey = `cart:user-${userId}`;
-
     // Run atomic Lua script to decrement inventory
-    const newInventory = await redisClient.eval(reserveLuaScript, {
-      keys: [inventoryKey],
-    });
+    const newInventory = await redisClient.eval(
+      reserveLuaScript,
+      1,
+      inventoryKey
+    );
 
-    console.log(newInventory);
+    logger.info(`Lua returned inventory ${newInventory}`);
     if (newInventory < 0) {
       return res.status(400).json({ error: "Out of stock" });
     }
@@ -60,10 +61,9 @@ router.post("/:id/reserve", async (req, res) => {
     // Generate clean reservation ID
     const reservationId = uuidv4();
     const cartEntry = `${id}:rev-${reservationId}`;
-    console.log("My cartEntry:", cartEntry);
     const reservationKey = `reservation:product:${id}:user-${userId}:rev-${reservationId}`;
 
-    const tenMinutesFromNow = new Date(Date.now() + 60000);
+    const tenMinutesFromNow = new Date(Date.now() + 5000);
 
     //Save to DB
     await pool.query(
@@ -72,10 +72,10 @@ router.post("/:id/reserve", async (req, res) => {
     );
 
     // Set Redis reservation key with TTL
-    await redisClient.setEx(reservationKey, 600, "reserved");
+    await redisClient.setex(reservationKey, 5, "reserved");
 
     // Add product to user's cart in Redis Set
-    await redisClient.sAdd(cartKey, cartEntry);
+    await redisClient.sadd(cartKey, cartEntry);
     logger.info(
       `Product ${id} reserved for user ${userId}. Hold expires in 10 minutes.`
     );
@@ -105,14 +105,13 @@ router.post("/:id/purchase", async (req, res) => {
     // Execute the checkout script in one single command, and handle it atomically
     const [successful, failed, debugLogs] = await redisClient.eval(
       checkoutLuaScript,
-      {
-        keys: [cartKey],
-        arguments: [userId],
-      }
+      1,
+      cartKey,
+      userId
     );
 
-    console.log("Lua Debug Logs:");
-    console.log(debugLogs.join("\n"));
+    logger.info("Lua Debug Logs:");
+    logger.info(debugLogs.join("\n"));
 
     if (successful.length === 0) {
       return res.status(400).json({

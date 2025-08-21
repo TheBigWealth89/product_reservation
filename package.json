@@ -13,9 +13,6 @@
     "dev:cleanupWorker": "cross-env NODE_ENV=development node src/workers/cleanupWorker.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "engines": {
-    "node": ">=20"
-  },
   "type": "module",
   "keywords": [],
   "author": "",
@@ -23,14 +20,13 @@
   "description": "",
   "dependencies": {
     "bullmq": "^5.56.10",
-    "connect-redis": "^9.0.0",
     "dotenv": "^17.2.0",
     "ejs": "^3.1.10",
     "express": "^5.1.0",
     "express-session": "^1.18.2",
+    "ioredis": "^5.7.0",
     "node-cron": "^4.2.1",
     "pg": "^8.16.3",
-    "redis": "^5.8.0",
     "uuid": "^11.1.0",
     "winston": "^3.17.0"
   },

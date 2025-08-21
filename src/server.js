@@ -1,7 +1,6 @@
 import express from "express";
+import "../src/workers/expiresWorker.js";
 import session from "express-session";
-import { RedisStore } from "connect-redis";
-import { redisClient } from "./db/connections.js";
 import { connectAll } from "./db/connections.js";
 import productRouter from "./routes/products.js";
 import adminRouter from "./routes/admin.js";
@@ -15,22 +14,15 @@ const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-const redisStore = new RedisStore({
-  client: redisClient,
-  prefix: "session:", // A recommended prefix for session keys in Redis
-});
-
-// Configure the session middleware to use the new store
 app.use(
   session({
-    store: redisStore,
-    secret: process.env.SESSION_SECRET, // Make sure to set this in your environment variables
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production", // Use secure cookies in production
+      secure: false,
       httpOnly: true,
-      maxAge: 1000 * 60 * 60 * 24, // 24 hours
+      maxAge: 1000 * 60 * 60 * 24,
     },
   })
 );

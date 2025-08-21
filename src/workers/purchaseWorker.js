@@ -9,7 +9,9 @@ new Worker(
       logger.warn(`Job ${job.id}: Simulating failure for user 'failing-user'.`);
       throw new Error("Simulated payment gateway failure.");
     }
+
     let client;
+
     try {
       const { successfulItems, userId } = job.data;
       logger.info(`Processing purchase job ${job.id} for user ${userId}`);
@@ -19,8 +21,16 @@ new Worker(
 
       for (const cartItem of successfulItems) {
         const [productId] = cartItem.split(":");
+
         const delay = (ms) => new Promise((res) => setTimeout(res, ms));
         await delay(Math.random() * 2000);
+
+        await pool.query(
+          `UPDATE reservations SET status = 'processing' 
+   WHERE reservation_id = $1 AND status = 'pending'`,
+          [cartItem]
+        );
+
         // Before doing anything, check if this reservation has already been completed.
         const checkResult = await client.query(
           "SELECT status FROM reservations WHERE reservation_id = $1",
@@ -47,16 +57,15 @@ new Worker(
         if (result.rowCount === 0) {
           throw new Error(`Product ${productId} out of stock`);
         }
-
         // throw new Error("Server crashed");
 
         if (result.rowCount > 0) {
           await client.query(
-            `UPDATE reservations
-                  SET status = 'completed',
-                      updated_at = NOW(),
-                      completed_at = NOW()
-                  WHERE reservation_id = $1`,
+            `UPDATE reservations 
+   SET status = 'completed',
+       updated_at = NOW()
+         WHERE reservation_id = $1 
+   AND status = 'processing'`, // Only update if still processing
             [cartItem]
           );
         }
@@ -78,7 +87,7 @@ new Worker(
       client.release();
     }
   },
-  { connection: { redisClient } }
+  { connection: redisClient }
 );
 
 logger.info("Database worker started and listening for jobs.");
