@@ -57,7 +57,7 @@ new Worker(
         if (result.rowCount === 0) {
           throw new Error(`Product ${productId} out of stock`);
         }
-        throw new Error("Server crashed");
+        // throw new Error("Server crashed");
 
         if (result.rowCount > 0) {
           await client.query(
