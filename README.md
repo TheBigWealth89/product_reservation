@@ -23,7 +23,7 @@ In any system with limited stock (like concert tickets or flash sale items), a n
 
 This system uses a modern, multi-service architecture to achieve high performance and fault tolerance.
 
-![Architecture Diagram](https://raw.githubusercontent.com/TheBigWealth89/product_reservation/main/src/assets/reservation_diagram.drawio.png)
+![Architecture Diagram](https://raw.githubusercontent.com/TheBigWealth89/product_reservation/main/src/assets/reservation_diagram.drawi.png)
 
 * **API Server (Express.js):** A lightweight web service that handles incoming requests. It offloads all slow database work to the job queue, allowing it to respond to the user in milliseconds.
 * **Redis (The Gatekeeper):** Acts as a high-speed in-memory store for three critical tasks:
@@ -69,7 +69,7 @@ This system uses a modern, multi-service architecture to achieve high performanc
 
 1.  **Clone the repository:**
     ```bash
-    git clone [https://github.com/TheBigWealth89/product_reservation.git](https://github.com/TheBigWealth89/product_reservation.git)
+    git clone https://github.com/TheBigWealth89/product_reservation.git
     cd product_reservation
     ```
 
