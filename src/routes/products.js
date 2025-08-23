@@ -46,6 +46,7 @@ router.post("/:id/reserve", async (req, res) => {
     const userId = req.headers["x-user-id"] || "user-1234";
     const inventoryKey = `inventory:product-${id}`;
     const cartKey = `cart:user-${userId}`;
+
     // Run atomic Lua script to decrement inventory
     const newInventory = await redisClient.eval(
       reserveLuaScript,
@@ -103,15 +104,12 @@ router.post("/:id/purchase", async (req, res) => {
     const cartKey = `cart:user-${userId}`;
 
     // Execute the checkout script in one single command, and handle it atomically
-    const [successful, failed, debugLogs] = await redisClient.eval(
+    const [successful, failed] = await redisClient.eval(
       checkoutLuaScript,
       1,
       cartKey,
       userId
     );
-
-    logger.info("Lua Debug Logs:");
-    logger.info(debugLogs.join("\n"));
 
     if (successful.length === 0) {
       return res.status(400).json({
@@ -121,6 +119,7 @@ router.post("/:id/purchase", async (req, res) => {
       });
     }
 
+    //Process the jobs in queue
     if (successful.length > 0) {
       const job = await purchaseQueue.add(
         "process-purchase",

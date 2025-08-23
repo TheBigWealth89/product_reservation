@@ -6,7 +6,6 @@ class ExpirationCleanup {
     this.isRunning = false;
     this.interval = 30000; // 30 seconds
   }
-
   async cleanupExpired() {
     if (this.isRunning) return;
     this.isRunning = true;
@@ -15,7 +14,6 @@ class ExpirationCleanup {
     
     try {
       await client.query('BEGIN');
-
       // Find expired reservations
       const expired = await client.query(`
         SELECT * FROM reservations 
@@ -23,7 +21,6 @@ class ExpirationCleanup {
         AND status = 'pending'
         FOR UPDATE SKIP LOCKED
       `);
-
       for (const reservation of expired.rows) {
         try {
           // Update status

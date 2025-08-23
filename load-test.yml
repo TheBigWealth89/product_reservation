@@ -2,7 +2,7 @@ config:
   target: "http://localhost:3000"
   phases:
     - duration: 1
-      arrivalCount: 300 # Simulate 20 users trying to reserve in 2 seconds
+      arrivalCount: 20 # Simulate 20 users trying to reserve in 1 seconds
 scenarios:
   - flow:
       - post:
