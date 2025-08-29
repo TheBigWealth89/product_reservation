@@ -16,21 +16,20 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer);
 
-// Listen for new connection
 io.on("connection", (socket) => {
-  console.log("✅ A user connected with socket ID:", socket.id);
+  logger.info(`A user connected with socket id:${socket.id}`);
 
-  // Listen for a message event from this client
-  socket.io("chat-message", (msg) => {
-    console.log("Message received", msg);
-    // Broadcast the message to other clients
+  socket.on("chat-message", (msg) => {
+    logger.info("message received");
+
     io.emit("chat-message", msg);
   });
 
-  socket.on("disconnect", () => {
-    console.log("❌ User disconnected");
+  io.on("disconnect", (reason) => {
+    logger.error(`User disconnected ${reason}`);
   });
 });
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(
@@ -77,6 +76,10 @@ app.get("/admin/logout", (req, res) => {
   res.redirect("/admin/login");
 });
 
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
 app.use("/product", productRouter);
 
 app.use("/admin", isAuthenticated, adminRouter);
@@ -97,7 +100,6 @@ httpServer.listen(3000, () => {
     app.listen(port, () => {
       logger.info(`🚀 Server running on http://localhost:${port}`);
     });
-
   } catch (err) {
     logger.error("💥 Failed to start server:", err);
     process.exit(1);
