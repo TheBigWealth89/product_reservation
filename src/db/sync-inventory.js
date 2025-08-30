@@ -51,7 +51,6 @@ export const syncInventoryToRedis = async () => {
         0,
         totalInventory - activeReservations - activeInQueue
       );
-
       //  Set this correct value in Redis
       const key = `inventory:product-${product.id}`;
       multi.set(key, availableInventory);

@@ -14,8 +14,7 @@ export const pool = new Pool({
 
 // --- Redis Connection ---
 const redisUrl = process.env.REDIS_URL;
-export const redisClient = new Redis(
-  redisUrl,{
+export const redisClient = new Redis(redisUrl, {
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
   rejectUnauthorized: true,

@@ -72,6 +72,7 @@ async function initialize() {
 
             // Restore inventory
             await redisClient.incr(`inventory:product-${productId}`);
+            
             logger.info(`🔄 Restored inventory for product ${productId}`);
           }
 

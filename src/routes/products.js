@@ -19,19 +19,26 @@ const checkoutLuaScript = fs.readFileSync(
   path.join(__dirname, "../../checkout.lua"),
   "utf8"
 );
+
 router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query("SELECT * FROM products WHERE id = $1", [
       id,
     ]);
+    
     if (result.rows.length === 0) {
       return res.status(404).send("Product not found");
     }
+    
     const product = result.rows[0];
     // Get inventory from Redis for consistency in UI
     const inventory = await redisClient.get(`inventory:product-${id}`);
-    product.inventory = parseInt(inventory, 10) || product.inventory;
+
+    if (inventory !== null) {
+      product.inventory = parseInt(inventory, 10);
+    }
+
     res.render("product", { product });
   } catch (err) {
     logger.error(`Error to get reservations ${err}`);

@@ -2,7 +2,7 @@
 <html>
   <head>
     <title>Product Reservation</title>
-    <link rel="stylesheet" href="../public/style.css" />
+    <!-- <link rel="stylesheet" href="../public/style.css" /> -->
 
     <style>
       body {
@@ -28,8 +28,28 @@
     <button onclick="reserveProduct('<%= product.id %>')">Reserve</button>
     <p id="message"></p>
 
+   <script src="/socket.io/socket.io.js"></script>
     <script>
-      async function reserveProduct(id) {
+    const productId = window.location.pathname.split("/").pop()
+    const inventorySpan = document.getElementById('inventory')
+    const messageP = document.getElementById("message")
+
+    //Create a socket connection 
+       const socket = io();
+
+       // As soon we connect join right room
+       socket.on('connect', () =>{
+        console.log('Connected to server, joining room for product:', productId);
+        // Tell the server which product page this user is viewing.
+        socket.emit("join-product-room", productId);
+       })
+
+         socket.on("inventory-update", (newInventory) => {
+           console.log(newInventory);
+      inventorySpan.innerText = newInventory;
+      
+  });
+        async function reserveProduct(id) {
         try {
           const response = await fetch(`/product/${id}/reserve`, {
             method: "POST",
@@ -37,13 +57,13 @@
           });
           const data = await response.json();
           if (response.ok) {
-            document.getElementById("inventory").textContent = data.inventory;
-            document.getElementById("message").textContent = data.message;
+            inventorySpan.textContent = data.inventory;
+            messageP.textContent = data.message;
           } else {
-            document.getElementById("message").textContent = data.error;
+            messageP.textContent = data.error;
           }
         } catch (err) {
-          document.getElementById("message").textContent =
+          messageP.textContent =
             "Error reserving product";
         }
       }

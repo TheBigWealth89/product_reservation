@@ -1,9 +1,8 @@
 import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
-import "../src/workers/expiresWorker.js";
 import session from "express-session";
-import { connectAll } from "./db/connections.js";
+import { connectAll, redisClient } from "./db/connections.js";
 import productRouter from "./routes/products.js";
 import adminRouter from "./routes/admin.js";
 import { syncInventoryToRedis } from "./db/sync-inventory.js";
@@ -19,15 +18,36 @@ const io = new Server(httpServer);
 io.on("connection", (socket) => {
   logger.info(`A user connected with socket id:${socket.id}`);
 
-  socket.on("chat-message", (msg) => {
-    logger.info("message received");
-
-    io.emit("chat-message", msg);
+  socket.on("join-product-room", (productId) => {
+    socket.join(`product-${productId}`);
+    logger.info(`Socket ${socket.id} joined room for product ${productId}`);
   });
 
   io.on("disconnect", (reason) => {
     logger.error(`User disconnected ${reason}`);
   });
+});
+
+const subscriber = redisClient.duplicate();
+
+// Subscribe to the CHANNEL, not the key
+subscriber.subscribe("inventory-updates", (err, count) => {
+  if (err) {
+    logger.error("Failed to subscribe:", err);
+    return;
+  }
+  logger.info(`Subscribed successfully to ${count} channels.`);
+});
+
+// Use the 'message' event listener to handle incoming messages
+subscriber.on("message", (channel, message) => {
+  logger.info(`Received message from channel: ${channel}`);
+  if (channel === "inventory-updates") {
+    const data = JSON.parse(message);
+    logger.info(data);
+    // Broadcast the update ONLY to the specific product room
+    io.to(`product-${data.id}`).emit("inventory-update", data.newInventory);
+  }
 });
 
 app.use(express.json());

@@ -1,6 +1,7 @@
 import express from "express";
 import purchaseQueue from "../queues/purchaseQueue.js";
-import { redisClient, pool, connectAll } from "../db/connections.js";
+import { pool, connectAll } from "../db/connections.js";
+import returnStock from "../service/inventory.service.js";
 import logger from "../utils/logger.js";
 
 const router = express.Router();
@@ -110,7 +111,7 @@ router.post("/jobs/:jobId/cancel", async (req, res) => {
         );
 
         //Restore inventory
-        await redisClient.incr(`inventory:product-${productId}`);
+        await returnStock(productId);
       }
     }
     await client.query("COMMIT");

@@ -1,4 +1,5 @@
 import { pool, redisClient } from "../db/connections.js";
+import returnStock from "../service/inventory.service.js"
 import logger from "../utils/logger.js";
 
 class ExpirationCleanup {
@@ -30,7 +31,8 @@ class ExpirationCleanup {
           );
 
           // Restore inventory
-          await redisClient.incr(`inventory:product-${reservation.product_id}`);
+          // await redisClient.incr(`inventory:product-${reservation.product_id}`);
+          await returnStock(reservation.product_id)
 
           // Remove from cart
           await redisClient.srem(
