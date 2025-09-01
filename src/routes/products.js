@@ -26,11 +26,11 @@ router.get("/:id", async (req, res) => {
     const result = await pool.query("SELECT * FROM products WHERE id = $1", [
       id,
     ]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).send("Product not found");
     }
-    
+
     const product = result.rows[0];
     // Get inventory from Redis for consistency in UI
     const inventory = await redisClient.get(`inventory:product-${id}`);
@@ -65,6 +65,13 @@ router.post("/:id/reserve", async (req, res) => {
     if (newInventory < 0) {
       return res.status(400).json({ error: "Out of stock" });
     }
+
+    const updateMessage = JSON.stringify({
+      productId: id,
+      newInventory: newInventory,
+    });
+
+    await redisClient.publish("inventory-updates", updateMessage);
 
     // Generate clean reservation ID
     const reservationId = uuidv4();

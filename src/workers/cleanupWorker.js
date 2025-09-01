@@ -1,5 +1,6 @@
 import { Queue, Worker } from "bullmq";
 import { redisClient, connectAll, pool } from "../db/connections.js";
+import returnStock from "../service/inventory.service.js";
 import logger from "../utils/logger.js";
 import purchaseQueue from "../queues/purchaseQueue.js";
 import cron from "node-cron";
@@ -71,8 +72,8 @@ async function initialize() {
             logger.info(`📝 Updated ${res.rowCount} reservations`);
 
             // Restore inventory
-            await redisClient.incr(`inventory:product-${productId}`);
-            
+            await returnStock(productId);
+
             logger.info(`🔄 Restored inventory for product ${productId}`);
           }
 
