@@ -42,13 +42,15 @@
         console.log('Connected to server, joining room for product:', productId);
         // Tell the server which product page this user is viewing.
         socket.emit("join-product-room", productId);
+        
        })
 
-         socket.on("inventory-update", (newInventory) => {
-           console.log(newInventory);
-      inventorySpan.innerText = newInventory;
-      
-  });
+       socket.on("inventory-update", (newInventory) => {
+           console.log("NewInventory successfully updated", newInventory);
+      messageP.innerText = newInventory;
+      });
+
+
         async function reserveProduct(id) {
         try {
           const response = await fetch(`/product/${id}/reserve`, {
