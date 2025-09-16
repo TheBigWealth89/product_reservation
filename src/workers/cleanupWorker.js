@@ -1,121 +1,97 @@
-import { Queue, Worker } from "bullmq";
-import { redisClient, connectAll, pool } from "../db/connections.js";
+import { pool, redisClient, connectAll } from "../db/connections.js";
 import returnStock from "../service/inventory.service.js";
 import logger from "../utils/logger.js";
 import purchaseQueue from "../queues/purchaseQueue.js";
 import cron from "node-cron";
 
+// This function contains the core logic of your old worker
+async function runCleanup() {
+  logger.info("🔄 Cron job started: Checking for failed purchase jobs...");
+
+  // Use a lock to prevent multiple instances from running at the same time
+  // This is critical if you ever scale to more than one worker instance.
+  const lockAcquired = await redisClient.set(
+    "cleanup-lock",
+    "running",
+    "NX",
+    "EX",
+    300
+  ); // Lock expires after 5 minutes to prevent it getting stuck
+
+  if (!lockAcquired) {
+    logger.warn("Cleanup job is already running. Skipping this run.");
+    return;
+  }
+
+  try {
+    const failedJobs = await purchaseQueue.getFailed();
+    if (failedJobs.length === 0) {
+      logger.info("✅ No failed jobs to clean up.");
+      return;
+    }
+
+    logger.info(`Found ${failedJobs.length} failed jobs to process.`);
+    // You can add your batch processing logic here if you want.
+    // For simplicity, this version processes them one by one.
+    for (const job of failedJobs) {
+      await processFailedJob(job);
+    }
+  } catch (error) {
+    logger.error("Error during cleanup process:", error);
+  } finally {
+    // Always release the lock
+    await redisClient.del("cleanup-lock");
+    logger.info("🔄 Cleanup job finished.");
+  }
+}
+
+async function processFailedJob(job) {
+  let client;
+  try {
+    client = await pool.connect();
+    await client.query("BEGIN");
+
+    // The job data now has `orderId`
+    const { orderId } = job.data;
+
+    // Update the order status to 'cancelled'
+    const updateResult = await client.query(
+      `UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1 AND status != 'completed'`,
+      [orderId]
+    );
+
+    if (updateResult.rowCount > 0) {
+      const order = (
+        await client.query("SELECT product_id FROM orders WHERE id = $1", [
+          orderId,
+        ])
+      ).rows[0];
+      // Use your inventory service to return the stock
+      await returnStock(order.product_id);
+      logger.info(
+        `Cancelled order ${orderId} and returned stock for product ${order.product_id}.`
+      );
+    }
+
+    await client.query("COMMIT");
+    await job.remove(); // Remove the handled job from the failed list
+    logger.info(`✅ Successfully cleaned job ${job.id}`);
+  } catch (err) {
+    if (client) await client.query("ROLLBACK");
+    logger.error(`❌ Failed to clean job ${job.id}:`, err);
+  } finally {
+    if (client) client.release();
+  }
+}
+
+// Main initialization function
 async function initialize() {
   await connectAll();
 
-  // Initialize cleanup queue
-  const cleanupQueue = new Queue("cleanup", {
-    connection: { redisClient },
-  });
+  const schedule = "*/20 * * * * *"; // Every 20 seconds for testing
+  logger.info(`🚀 Cleanup scheduler started. Running every 20 seconds.`);
 
-  // Create worker with verbose logging
-  const cleanupWorker = new Worker(
-    "cleanup",
-    async () => {
-      logger.info("🔄 Starting cleanup job...");
-
-      const failedJobs = await purchaseQueue.getFailed();
-      logger.info(`Found ${failedJobs.length} failed jobs to process`);
-
-      for (const job of failedJobs) {
-        const failedTime = job.failedOn
-          ? new Date(job.failedOn)
-          : job.timestamp
-          ? new Date(job.timestamp)
-          : null;
-
-        const timeString = failedTime
-          ? failedTime.toISOString()
-          : "time not available";
-        logger.info(`FailedOn ${timeString}`);
-        const client = await pool.connect();
-        try {
-          await client.query("BEGIN");
-
-          // Process each item
-          for (const cartItem of job.data?.successfulItems || []) {
-            logger.info(`🛠️ Processing item: ${cartItem}`);
-
-            // Before doing anything, check if this reservation has already been cancelled.
-            const checkResult = await client.query(
-              "SELECT status FROM reservations WHERE reservation_id = $1",
-              [cartItem]
-            );
-
-            if (
-              checkResult.rows.length > 0 &&
-              checkResult.rows[0].status === "cancelled"
-            ) {
-              logger.warn(
-                `Job ${job.id}: Reservation ${cartItem} already cancelled. Skipping.`
-              );
-              // Continue to the next item in the cart
-              continue;
-            }
-
-            const [productId] = cartItem.split(":");
-
-            //Update reservation
-            const res = await client.query(
-              `UPDATE reservations 
-             SET status = 'cancelled',
-                 updated_at = NOW()
-             WHERE reservation_id = $1
-             RETURNING id`,
-              [cartItem]
-            );
-            logger.info(`📝 Updated ${res.rowCount} reservations`);
-
-            // Restore inventory
-            await returnStock(productId);
-
-            logger.info(`🔄 Restored inventory for product ${productId}`);
-          }
-
-          await client.query("COMMIT");
-          await job.remove();
-          logger.info(`✅ Successfully cleaned job ${job.id}`);
-        } catch (err) {
-          await client.query("ROLLBACK");
-          logger.error(`❌ Failed to clean job ${job.id}:`, err);
-        } finally {
-          client.release();
-        }
-      }
-    },
-    {
-      connection: { redisClient },
-      limiter: {
-        max: 1,
-        duration: 1000,
-      },
-    }
-  );
-
-  // const testSchedule = "*/20 * * * * *";
-  // const fiveMinutes = "*/5 * * * *";
-  const threeHrs = "0 */3 * * *";
-  logger.info(`Setting up test schedule: ${threeHrs}`);
-  cron.schedule(threeHrs, () => {
-    logger.info("⏰ Triggering scheduled cleanup");
-    cleanupQueue.add("cleanup", {});
-  });
-
-  // Event listeners for monitoring
-  cleanupWorker.on("completed", () => {
-    logger.info("Cleanup job completed");
-  });
-
-  cleanupWorker.on("failed", (job, err) => {
-    logger.error(`💥 Cleanup job failed: ${err.message}`);
-  });
-
-  logger.info("🚀 Cleanup worker started (20s test mode)");
+  cron.schedule(schedule, runCleanup);
 }
 
 initialize();

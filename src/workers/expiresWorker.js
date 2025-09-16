@@ -1,5 +1,5 @@
 import { pool, redisClient } from "../db/connections.js";
-import returnStock from "../service/inventory.service.js"
+import returnStock from "../service/inventory.service.js";
 import logger from "../utils/logger.js";
 
 class ExpirationCleanup {
@@ -12,46 +12,47 @@ class ExpirationCleanup {
     this.isRunning = true;
 
     const client = await pool.connect();
-    
+
     try {
-      await client.query('BEGIN');
+      await client.query("BEGIN");
       // Find expired reservations
       const expired = await client.query(`
-        SELECT * FROM reservations 
+        SELECT * FROM orders 
         WHERE expires_at < NOW() 
-        AND status = 'pending'
+        AND status = 'reserved'
         FOR UPDATE SKIP LOCKED
       `);
       for (const reservation of expired.rows) {
         try {
           // Update status
           await client.query(
-            `UPDATE reservations SET status = 'expired' WHERE id = $1`,
+            `UPDATE orders SET status = 'expired' WHERE id = $1`,
             [reservation.id]
           );
 
           // Restore inventory
           // await redisClient.incr(`inventory:product-${reservation.product_id}`);
-          await returnStock(reservation.product_id)
+          await returnStock(reservation.product_id);
 
           // Remove from cart
           await redisClient.srem(
-            `cart:user-${reservation.user_id}`, 
+            `cart:user-${reservation.user_id}`,
             reservation.reservation_id
           );
 
-          logger.info(`Cleaned expired reservation: ${reservation.reservation_id}`);
+          logger.info(
+            `Cleaned expired reservation: ${reservation.reservation_id}`
+          );
         } catch (err) {
           logger.error(`Failed to clean reservation ${reservation.id}:`, err);
           // Continue with other reservations
         }
       }
 
-      await client.query('COMMIT');
-      
+      await client.query("COMMIT");
     } catch (err) {
-      await client.query('ROLLBACK');
-      logger.error('Cleanup transaction failed:', err);
+      await client.query("ROLLBACK");
+      logger.error("Cleanup transaction failed:", err);
     } finally {
       client.release();
       this.isRunning = false;
@@ -59,7 +60,7 @@ class ExpirationCleanup {
   }
 
   start() {
-    logger.info('🔄 Starting expiration cleanup worker (30s interval)');
+    logger.info("🔄 Starting expiration cleanup worker (30s interval)");
     setInterval(() => this.cleanupExpired(), this.interval);
     this.cleanupExpired(); // Run immediately
   }

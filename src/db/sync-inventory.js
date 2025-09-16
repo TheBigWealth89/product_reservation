@@ -16,40 +16,38 @@ export const syncInventoryToRedis = async () => {
     logger.info(
       `Jobs - Waiting: ${waitingJobs.length}, Active: ${activeJobs.length}, Completed: ${completed.length}, Failed: ${failedJobs.length}`
     );
-    const allJobs = [...waitingJobs, ...activeJobs, ...failedJobs];
-
-    //Count how many items of each product are locked in the queue
-    const queuedItemsCount = {};
-    for (const job of allJobs) {
-      for (const cartItem of job.data.successfulItems) {
-        const [productId] = cartItem.split(":");
-        queuedItemsCount[productId] = (queuedItemsCount[productId] || 0) + 1;
-      }
-    }
-
+   
     //Sync each product's inventory to redis
     const multi = redisClient.multi();
     for (const product of products) {
       const totalInventory = product.inventory;
 
-      // Count only pending + unexpired reservations
+      // Count only reserved + unexpired reservations
       const reservationResult = await pool.query(
         `SELECT COUNT(*) 
-         FROM reservations 
+         FROM orders 
          WHERE product_id = $1 
            AND expires_at > NOW() 
-           AND status = 'pending'`,
+           AND status = 'reserved'`,
         [product.id]
       );
 
+      const pendingPayment = await pool.query(
+        `SELECT COUNT(*) 
+         FROM orders 
+         WHERE product_id = $1 AND
+        status = 'payment_pending'`,
+        [product.id]
+      );
+
+      const activePendingPayment = parseInt(pendingPayment.rows[0].count, 10);
       const activeReservations = parseInt(reservationResult.rows[0].count, 10);
-      const activeInQueue = queuedItemsCount[product.id] || 0;
-      logger.info("Queue count: ", activeInQueue);
+    
 
       // Calculate the true available inventory
       const availableInventory = Math.max(
         0,
-        totalInventory - activeReservations - activeInQueue
+        totalInventory - activeReservations - activePendingPayment
       );
       //  Set this correct value in Redis
       const key = `inventory:product-${product.id}`;

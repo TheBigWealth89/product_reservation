@@ -23,8 +23,6 @@ async function initialize() {
 // Dashboard route with pagination
 router.get("/dashboard", async (req, res) => {
   try {
-    // await initialize();
-
     const page = parseInt(req.query.page) || 1;
     const pageSize = 10;
     const startIdx = (page - 1) * pageSize;
@@ -77,8 +75,8 @@ router.post("/jobs/:jobId/retry", async (req, res) => {
 
 // Cancel job
 router.post("/jobs/:jobId/cancel", async (req, res) => {
-  const client = await pool.connect();
   const { jobId } = req.params;
+  let client;
   try {
     await initialize();
 
@@ -89,31 +87,42 @@ router.post("/jobs/:jobId/cancel", async (req, res) => {
       return res.status(404).send("Job not found or not failed");
     }
 
+    const { orderId } = job.data;
+    console.log(orderId);
+
+    client = await pool.connect();
     await client.query("BEGIN");
-    for (const cartItem of job.data?.successfulItems || []) {
-      const [productId] = cartItem.split(":");
+
+    const orderResult = await client.query(
+      "SELECT product_id FROM orders WHERE id = $1",
+      [orderId]
+    );
+    if (orderResult.rows.length > 0) {
+      const { product_id } = orderResult.rows[0];
 
       //Check current status first
       const { rows } = await client.query(
-        `SELECT status FROM reservations 
-         WHERE reservation_id = $1 
+        `SELECT status FROM orders 
+         WHERE id = $1 
          FOR UPDATE`,
-        [cartItem]
+        [orderId]
       );
 
       if (rows[0]?.status !== "cancelled") {
+        console.log("This is true");
         await client.query(
-          `UPDATE reservations 
-           SET status = 'cancelled', 
-               updated_at = NOW() 
-           WHERE reservation_id = $1`,
-          [cartItem]
+          `UPDATE orders 
+             SET status = 'cancelled',
+                 updated_at = NOW() 
+             WHERE id = $1`,
+          [orderId]
         );
 
         //Restore inventory
-        await returnStock(productId);
+        await returnStock(product_id);
       }
     }
+
     await client.query("COMMIT");
     await job.remove();
     logger.info(`Admin cancelled job ${jobId}`, {

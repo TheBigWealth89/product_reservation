@@ -3,91 +3,75 @@ import { redisClient, pool } from "../db/connections.js";
 import logger from "../utils/logger.js";
 
 new Worker(
-  "purchase-processing",
+  "fulfill-order",
   async (job) => {
-    // if (job.data.userId === "failing-user") {
-    //   logger.warn(`Job ${job.id}: Simulating failure for user 'failing-user'.`);
-    //   throw new Error("Simulated payment gateway failure.");
-    // }
+    if (!job.data || !job.data.orderId) {
+      logger.error(
+        `Job ${job.id} failed: Invalid job data received.`,
+        job.data
+      );
+      // Throw an error to move the job to the failed queue without retrying.
+      throw new Error("Invalid job data: missing orderId.");
+    }
+
+    const { orderId } = job.data;
+    logger.info(`Fulfilling order ${orderId}`);
 
     let client;
-
     try {
-      const { successfulItems, userId } = job.data;
-      logger.info(`Processing purchase job ${job.id} for user ${userId}`);
-
       client = await pool.connect();
       await client.query("BEGIN");
 
-      for (const cartItem of successfulItems) {
-        const [productId] = cartItem.split(":");
+      // Get the order details
+      const orderResult = await client.query(
+        "SELECT * FROM orders WHERE id = $1 FOR UPDATE", // Lock the row
+        [orderId]
+      );
+      const order = orderResult.rows[0];
 
-        // const delay = (ms) => new Promise((res) => setTimeout(res, ms));
-        // await delay(Math.random() * 2000);
-
-        await pool.query(
-          `UPDATE reservations SET status = 'processing' 
-   WHERE reservation_id = $1 AND status = 'pending'`,
-          [cartItem]
-        );
-
-        // Before doing anything, check if this reservation has already been completed.
-        const checkResult = await client.query(
-          "SELECT status FROM reservations WHERE reservation_id = $1",
-          [cartItem]
-        );
-
-        if (
-          checkResult.rows.length > 0 &&
-          checkResult.rows[0].status === "completed"
-        ) {
-          logger.warn(
-            `Job ${job.id}: Reservation ${cartItem} already completed. Skipping.`
-          );
-          // Continue to the next item in the cart
-          continue;
-        }
-
-        // Reduce inventory in Postgres
-        const result = await client.query(
-          "UPDATE products SET inventory = inventory - 1 WHERE id = $1 AND inventory > 0 RETURNING id",
-          [productId]
-        );
-
-        if (result.rowCount === 0) {
-          throw new Error(`Product ${productId} out of stock`);
-        }
-        // throw new Error("Server crashed");
-
-        if (result.rowCount > 0) {
-          await client.query(
-            `UPDATE reservations 
-   SET status = 'completed',
-       updated_at = NOW()
-         WHERE reservation_id = $1 
-   AND status = 'processing'`, // Only update if still processing
-            [cartItem]
-          );
-        }
+      if (!order) {
+        throw new Error(`Order with ID ${orderId} not found.`);
       }
+
+      // Idempotency Check
+      if (order.status === "completed") {
+        logger.warn(`Order ${orderId} has already been fulfilled. Skipping.`);
+        await client.query("COMMIT"); // Commit the empty transaction
+        return; // Job is successful
+      }
+
+      // throw error("server crashed");
+
+      //Decrement the main inventory in the products table
+      await client.query(
+        "UPDATE products SET inventory = inventory - 1 WHERE id = $1 AND inventory > 0",
+        [order.product_id]
+      );
+
+      //Mark the order as 'completed'
+      await client.query(
+        "UPDATE orders SET status = 'completed' WHERE id = $1",
+        [orderId]
+      );
+
       await client.query("COMMIT");
-      logger.info(`Job ${job.id} completed successfully.`);
+      logger.info(`✅ Order ${orderId} fulfilled successfully.`);
     } catch (e) {
       if (client) {
         await client.query("ROLLBACK");
       }
+
       logger.error(`Job ${job.id} failed: ${e.message}`, {
         stack: e.stack,
         data: job.data,
       });
-      // logger.error(`Job ${job.id} failed. It will be retried.`, e);
       logger.info(`Processing job ${job.id} attempt ${job.attemptsMade + 1}`);
-      throw e;
+      throw e; // Re-throw to trigger BullMQ's retry
     } finally {
-      client.release();
+      if (client) {
+        client.release();
+      }
     }
   },
   { connection: redisClient }
 );
-
-logger.info("Database worker started and listening for jobs.");
