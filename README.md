@@ -23,7 +23,7 @@ In any high-traffic e-commerce application, a naive approach will fail. This pro
 
 This system uses a modern, multi-service architecture to achieve high performance, fault tolerance, and a dynamic user experience.
 
-![Architecture Diagram](https://raw.githubusercontent.com/TheBigWealth89/product_reservation/main/src/assets/reservation_diagram.drawio.png)
+![Architecture Diagram](https://raw.githubusercontent.com/TheBigWealth89/product_reservation/main/src/assets/reservation_diagram.drawi.png)
 
 ### System Workflow
 
