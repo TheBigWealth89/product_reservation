@@ -5,11 +5,11 @@
   "scripts": {
     "start": "cross-env NODE_ENV=production node src/server.js",
     "start:expiresWorker": "cross-env NODE_ENV=production node src/workers/expiresWorker.js",
-    "start:purchaseWorker": "cross-env NODE_ENV=production node src/workers/fulfillOrder.js",
+    "start:fulfillOrderWorker": "cross-env NODE_ENV=production node src/workers/fulfillOrderWorker.js",
     "start:cleanupWorker": "cross-env NODE_ENV=production node src/workers/cleanupWorker.js",
     "dev": " cross-env NODE_ENV=development nodemon src/server.js",
     "dev:expiresWorker": "cross-env NODE_ENV=development node src/workers/expiresWorker.js",
-    "dev:purchaseWorker": "cross-env NODE_ENV=development node src/workers/fulfillOrder.js",
+    "dev:fulfillOrderWorker": "cross-env NODE_ENV=development node src/workers/fulfillOrderWorker.js",
     "dev:cleanupWorker": "cross-env NODE_ENV=development node src/workers/cleanupWorker.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

@@ -25,6 +25,21 @@ This system uses a modern, multi-service architecture to achieve high performanc
 
 ![Architecture Diagram](https://raw.githubusercontent.com/TheBigWealth89/product_reservation/main/src/assets/reservation_diagram.drawio.png)
 
+### System Workflow
+
+The application operates through two primary flows: the **Order Flow** and the **Real-Time Update Flow**.
+1.  A **User** sends an HTTP request (e.g., to reserve or pay) to the **API Server**.
+2.  The **API Server** uses **Redis** for fast, atomic operations (Lua scripts) and to add jobs to the **BullMQ** queue.
+3.  For payments, the **API Server** communicates with the external **Stripe** service.
+4.  The **API Server** also uses Redis Pub/Sub to listen for updates from the workers. When it gets an update, it sends a message via **Socket.IO** back to the user.
+5.  The **Background Workers** pull jobs from the **Redis** queue.
+6.  The **Workers** do the heavy lifting, interacting with the main **PostgreSQL** database. They also `PUBLISH` messages to Redis when they're done.
+7.  **Stripe** sends asynchronous **Webhooks** back to a special endpoint on the **API Server** to confirm payments.
+
+---
+
+### Architectural Components
+
 - **API Server (Express.js):** A lightweight web service that handles incoming requests and acts as a **Real-Time Broadcaster**, using Socket.IO to push live updates to connected clients.
 - **Redis (The Gatekeeper):** Acts as a high-speed in-memory store for four critical tasks:
   1.  **Atomic Operations:** Lua scripts ensure inventory checks are race-condition-proof.
@@ -33,7 +48,7 @@ This system uses a modern, multi-service architecture to achieve high performanc
   4.  **Session & Cart Storage:** Provides a fast cache for user data.
 - **PostgreSQL (The Source of Truth):** The permanent, relational database that stores all product, inventory, and order data with transactional integrity.
 - **Stripe Integration:** Securely handles all sensitive payment information off-site, communicating with the backend via verified webhooks to confirm transactions.
-- **Background Workers:** Independent Node.js processes that handle specific, long-running tasks (order fulfillment, reservation expiration), allowing the system to scale and remain resilient.
+- **Background Workers:** Independent Node.js processes that handle specific, long-running tasks (order fulfillment, reservation expiration, cleanup worker), allowing the system to scale and remain resilient.
 
 ---
 
@@ -105,7 +120,7 @@ This is a multi-service application. Each component must be run in a separate te
 ### For Development
 
 - **Terminal 1 (Main API & Web Server):** `npm run dev`
-- **Terminal 2 (Purchase Fulfillment Worker):** `npm run dev:purchaseWorker`
+- **Terminal 2 (Purchase Fulfillment Worker):** `npm run dev:fulfillOrderWorker`
 - **Terminal 3 (Reservation Expiration Worker):** `npm run dev:expiresWorker`
 - **Terminal 4 (Failed Job Cleanup Worker):** `npm run dev:cleanupWorker`
 
