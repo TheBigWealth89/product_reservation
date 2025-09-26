@@ -127,7 +127,7 @@ This is a multi-service application. Each component must be run in a separate te
 ### For Production
 
 - **Terminal 1:** `npm run start`
-- **Terminal 2:** `npm run start:purchaseWorker`
+- **Terminal 2:** `npm run start:fulfillOrderWorker`
 - **Terminal 3:** `npm run start:expiresWorker`
 - **Terminal 4:** `npm run start:cleanupWorker`
 
@@ -143,4 +143,8 @@ To simulate a high-traffic event and verify that the race condition is solved, y
     # On macOS/Linux or Git Bash on Windows
     bash test_concurrency.sh
     ```
+
+    ```
+    
+     ```
 3.  This script will first create several reservations and then fire off all the purchase requests at the same time. Check your worker logs to observe how the jobs are processed concurrently and gracefully.

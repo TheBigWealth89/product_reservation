@@ -14,7 +14,7 @@ export const verifyStripeWebhook = (req, res, next) => {
     );
     next();
   } catch (err) {
-    console.error("Stripe verification failed:", err.message);
+    logger.error("Stripe verification failed:", err.message);
     res.status(400).send("Invalid Stripe signature");
   }
 };

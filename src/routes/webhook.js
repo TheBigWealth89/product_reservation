@@ -3,12 +3,12 @@ import { verifyStripeWebhook } from "../middleware/verifyWebhookSignature.js";
 import logger from "../utils/logger.js";
 import purchaseQueue from "../queues/purchaseQueue.js";
 const router = Router();
+
 router.post(
   "/webhook-stripe",
   express.raw({ type: "application/json" }),
   verifyStripeWebhook,
   async (req, res) => {
-    console.log("Webhook triggered");
     const event = req.stripeEvent;
     const paymentIntent = event.data.object;
     const orderIds = paymentIntent.metadata.order_ids.split(",");

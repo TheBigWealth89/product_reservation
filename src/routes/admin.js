@@ -88,8 +88,7 @@ router.post("/jobs/:jobId/cancel", async (req, res) => {
     }
 
     const { orderId } = job.data;
-    console.log(orderId);
-
+    
     client = await pool.connect();
     await client.query("BEGIN");
 
@@ -109,7 +108,6 @@ router.post("/jobs/:jobId/cancel", async (req, res) => {
       );
 
       if (rows[0]?.status !== "cancelled") {
-        console.log("This is true");
         await client.query(
           `UPDATE orders 
              SET status = 'cancelled',

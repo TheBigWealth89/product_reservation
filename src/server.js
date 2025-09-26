@@ -40,10 +40,6 @@ const __dirname = path.dirname(__filename);
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
-// app.get("/order/pay", (req, res) => {
-//   res.sendFile(path.join(__dirname, "public", "index.html"));
-// });
-
 app.get("/admin/login", (req, res) => {
   res.render("login", { error: null });
 });
@@ -65,7 +61,7 @@ httpServer.listen(3000, () => {
 // Connect & sync
 (async () => {
   try {
-    await connectAll(); // ensures Postgres + Redis are ready before starting
+    await connectAll(); // Ensures Postgres + Redis are ready before starting
 
     try {
       await syncInventoryToRedis();
