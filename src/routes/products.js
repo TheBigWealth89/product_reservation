@@ -21,7 +21,7 @@ const reserveLuaScript = fs.readFileSync(
   "utf8"
 );
 const checkoutLuaScript = fs.readFileSync(
-  path.join(__dirname, "../../checkout.lua"),
+  path.join(__dirname, "../../validate_cart.lua"),
   "utf8"
 );
 
@@ -129,6 +129,9 @@ router.get("/", async (req, res) => {
 
     //Get all item IDs from the user's cart in Redis
     const cartItems = await redisClient.smembers(cartKey);
+    console.log("CartItems: ", cartItems)
+    // redisClient.del(cartKey)
+    // redisClient.srem(cartKey)
 
     if (cartItems.length === 0) {
       return res.render("orderPage", {
@@ -147,7 +150,9 @@ router.get("/", async (req, res) => {
     });
 
     // Get unique product IDs for database query
-    const uniqueProductIds = Object.keys(productQuantities).map(id => parseInt(id));
+    const uniqueProductIds = Object.keys(productQuantities).map((id) =>
+      parseInt(id)
+    );
     const priceResult = await pool.query(
       "SELECT id, name, price FROM products WHERE id = ANY($1::int[])",
       [uniqueProductIds]
@@ -155,20 +160,20 @@ router.get("/", async (req, res) => {
 
     // Calculate the total amount with quantities
     let totalAmountInCents = 0;
-    const productsInCart = priceResult.rows.map(product => {
+    const productsInCart = priceResult.rows.map((product) => {
       const quantity = productQuantities[product.id];
       const priceInDollars = parseFloat(product.price);
       const priceInCents = Math.round(priceInDollars * 100);
       const totalPriceForProduct = priceInCents * quantity;
-      
+
       totalAmountInCents += totalPriceForProduct;
-      
+
       // Return product with quantity info for display
       return {
         ...product,
         quantity,
         priceInCents,
-        totalPrice: totalPriceForProduct
+        totalPrice: totalPriceForProduct,
       };
     });
 
@@ -202,6 +207,7 @@ router.post("/create-payment-intent", async (req, res) => {
       userId
     );
     successfulItems = validatedItems;
+    console.log(successfulItems);
 
     if (successfulItems.length === 0) {
       return res.status(400).json({

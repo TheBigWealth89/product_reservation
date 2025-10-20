@@ -27,31 +27,33 @@
     <p>Inventory: <span id="inventory"><%= product.inventory %></span></p>
     <button onclick="reserveProduct('<%= product.id %>')">Reserve</button>
     <p id="message"></p>
+    <a href="/product"><h4>Checkout</h4></a>
 
-   <script src="/socket.io/socket.io.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <script>
-    const productId = window.location.pathname.split("/").pop()
-    const inventorySpan = document.getElementById('inventory')
-    const messageP = document.getElementById("message")
+      const productId = window.location.pathname.split("/").pop();
+      const inventorySpan = document.getElementById("inventory");
+      const messageP = document.getElementById("message");
 
-    //Create a socket connection 
-       const socket = io();
+      //Create a socket connection
+      const socket = io();
 
-       // As soon we connect join right room
-       socket.on('connect', () =>{
-        console.log('Connected to server, joining room for product:', productId);
+      // As soon we connect join right room
+      socket.on("connect", () => {
+        console.log(
+          "Connected to server, joining room for product:",
+          productId
+        );
         // Tell the server which product page this user is viewing.
         socket.emit("join-product-room", productId);
-        
-       })
-
-       socket.on("inventory-update", (newInventory) => {
-           console.log("NewInventory successfully updated", newInventory);
-      messageP.innerText = newInventory;
       });
 
+      socket.on("inventory-update", (newInventory) => {
+        console.log("NewInventory successfully updated", newInventory);
+        messageP.innerText = newInventory;
+      });
 
-        async function reserveProduct(id) {
+      async function reserveProduct(id) {
         try {
           const response = await fetch(`/product/${id}/reserve`, {
             method: "POST",
@@ -65,8 +67,7 @@
             messageP.textContent = data.error;
           }
         } catch (err) {
-          messageP.textContent =
-            "Error reserving product";
+          messageP.textContent = "Error reserving product";
         }
       }
     </script>

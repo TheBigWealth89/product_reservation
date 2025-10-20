@@ -2,6 +2,7 @@ import express, { Router } from "express";
 import { verifyStripeWebhook } from "../middleware/verifyWebhookSignature.js";
 import logger from "../utils/logger.js";
 import purchaseQueue from "../queues/purchaseQueue.js";
+import { pool, redisClient } from "../db/connections.js";
 const router = Router();
 
 router.post(
@@ -12,6 +13,7 @@ router.post(
     const event = req.stripeEvent;
     const paymentIntent = event.data.object;
     const orderIds = paymentIntent.metadata.order_ids.split(",");
+    console.log("Webhook is triggered");
 
     if (event.type === "payment_intent.succeeded") {
       logger.info(`Payment succeeded ${paymentIntent.id}`);
@@ -37,6 +39,30 @@ router.post(
         logger.info(
           `Queued fulfillment jobs for orders: ${orderIds.join(", ")}`
         );
+
+        const result = await pool.query(
+          "SELECT reservation_id, product_id FROM orders WHERE id = ANY($1::int[])",
+          [orderIds]
+        );
+
+        if (result.rows.length > 0) {
+          const multi = redisClient.multi();
+          const cartKey = `cart:user-${userId}`;
+
+          for (const row of result.rows) {
+            const { reservation_id, product_id } = row;
+
+            const uuid = reservation_id.split("rev-")[1];
+
+            const reservationKey = `reservation:product:${product_id}:user-${userId}:rev-${uuid}`;
+
+            multi.del(reservationKey);
+            multi.srem(cartKey, reservation_id);
+          }
+
+          await multi.exec();
+          logger.info("✅ Redis state successfully cleaned up after purchase.");
+        }
       } catch (e) {
         logger.error(`Failed to queue job: ${e}`);
       }
