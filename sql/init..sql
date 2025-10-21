@@ -21,6 +21,6 @@ CREATE TABLE orders (
     stripe_payment_intent_id VARCHAR(255),
     amount NUMERIC(10, 2) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    expired_at TIMESTAMP NOT NULL DEFAULT NOW()
+    expires_at TYPE TIMESTAMPTZ;
     updated_at TIMESTAMP DEFAULT NOW()
 );

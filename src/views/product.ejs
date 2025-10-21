@@ -50,7 +50,7 @@
 
       socket.on("inventory-update", (newInventory) => {
         console.log("NewInventory successfully updated", newInventory);
-        messageP.innerText = newInventory;
+        inventorySpan.innerText = newInventory;
       });
 
       async function reserveProduct(id) {

@@ -9,7 +9,7 @@ for i, cartItem in ipairs(cartItems) do
     if productId and reservationId then
         local reservationKey = 'reservation:product:' .. productId .. ':user-' .. userId .. ':rev-' .. reservationId
         
-        -- Use EXISTS instead of DEL. This is a read-only check.
+        -- This is a read-only check.
         local keyExists = redis.call('EXISTS', reservationKey)
         
         if keyExists == 1 then

@@ -1,4 +1,5 @@
 import "../config/loadEnv.js";
+import { redisKey } from "../utils/redisKeys.js";
 import express from "express";
 import Stripe from "stripe";
 import { redisClient, pool } from "../db/connections.js";
@@ -44,6 +45,9 @@ router.get("/:id", async (req, res) => {
       product.inventory = parseInt(inventory, 10);
     }
 
+    //No store catch
+    res.setHeader("Cache-Control", "no-store");
+
     res.render("product", { product });
   } catch (err) {
     logger.error(`Error to get reservations ${err}`);
@@ -54,15 +58,14 @@ router.get("/:id", async (req, res) => {
 router.post("/:id/reserve", async (req, res) => {
   try {
     const { id } = req.params;
-
     const result = await pool.query("SELECT * FROM products WHERE id = $1", [
       id,
     ]);
 
     // Assuming this would come from authentication section
     const userId = req.headers["x-user-id"] || "user-1234";
-    const inventoryKey = `inventory:product-${id}`;
-    const cartKey = `cart:user-${userId}`;
+    const inventoryKey = redisKey.inventoryKey(id);
+    const cartKey = redisKey.cartKey(userId);
 
     // Run atomic Lua script to decrement inventory
     const newInventory = await redisClient.eval(
@@ -85,8 +88,8 @@ router.post("/:id/reserve", async (req, res) => {
 
     // Generate clean reservation ID
     const reservationId = uuidv4();
-    const cartEntry = `${id}:rev-${reservationId}`;
-    const reservationKey = `reservation:product:${id}:user-${userId}:rev-${reservationId}`;
+    const cartEntry = redisKey.cartEntry(id, reservationId);
+    const reservationKey = redisKey.reservationKey(id, userId, reservationId);
     const productAmount = result.rows[0].price;
     const tenMinutesFromNow = new Date(Date.now() + 60000);
 
@@ -125,11 +128,10 @@ router.post("/:id/reserve", async (req, res) => {
 router.get("/", async (req, res) => {
   try {
     const userId = req.headers["x-user-id"] || "user-1234";
-    const cartKey = `cart:user-${userId}`;
+    const cartKey = redisKey.cartKey(userId);
 
     //Get all item IDs from the user's cart in Redis
     const cartItems = await redisClient.smembers(cartKey);
-    console.log("CartItems: ", cartItems)
     // redisClient.del(cartKey)
     // redisClient.srem(cartKey)
 
@@ -194,10 +196,11 @@ router.get("/", async (req, res) => {
 
 router.post("/create-payment-intent", async (req, res) => {
   const userId = req.headers["x-user-id"] || "user-1234";
-  const cartKey = `cart:user-${userId}`;
+  const cartKey = redisKey.cartKey(userId);
   let client = null;
   let successfulItems = [];
   let compensationClient = null; // Separate client for compensation
+
   try {
     //Validate the cart in Redis
     const [validatedItems, failedItems] = await redisClient.eval(
@@ -207,7 +210,6 @@ router.post("/create-payment-intent", async (req, res) => {
       userId
     );
     successfulItems = validatedItems;
-    console.log(successfulItems);
 
     if (successfulItems.length === 0) {
       return res.status(400).json({

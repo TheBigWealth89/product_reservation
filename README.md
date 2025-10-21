@@ -28,6 +28,7 @@ This system uses a modern, multi-service architecture to achieve high performanc
 ### System Workflow
 
 The application operates through two primary flows: the **Order Flow** and the **Real-Time Update Flow**.
+
 1.  A **User** sends an HTTP request (e.g., to reserve or pay) to the **API Server**.
 2.  The **API Server** uses **Redis** for fast, atomic operations (Lua scripts) and to add jobs to the **BullMQ** queue.
 3.  For payments, the **API Server** communicates with the external **Stripe** service.
@@ -139,12 +140,15 @@ To simulate a high-traffic event and verify that the race condition is solved, y
 
 1.  Make sure your application services are running.
 2.  Run the script from your terminal:
+
     ```bash
     # On macOS/Linux or Git Bash on Windows
     bash test_concurrency.sh
     ```
 
     ```
-    
-     ```
+    # Test race condition
+    artillery run load-test.yml
+    ```
+
 3.  This script will first create several reservations and then fire off all the purchase requests at the same time. Check your worker logs to observe how the jobs are processed concurrently and gracefully.

@@ -3,6 +3,7 @@ import { verifyStripeWebhook } from "../middleware/verifyWebhookSignature.js";
 import logger from "../utils/logger.js";
 import purchaseQueue from "../queues/purchaseQueue.js";
 import { pool, redisClient } from "../db/connections.js";
+import { redisKey } from "../utils/redisKeys.js";
 const router = Router();
 
 router.post(
@@ -13,7 +14,6 @@ router.post(
     const event = req.stripeEvent;
     const paymentIntent = event.data.object;
     const orderIds = paymentIntent.metadata.order_ids.split(",");
-    console.log("Webhook is triggered");
 
     if (event.type === "payment_intent.succeeded") {
       logger.info(`Payment succeeded ${paymentIntent.id}`);
@@ -45,17 +45,19 @@ router.post(
           [orderIds]
         );
 
+        const userId = req.headers["x-user-id"] || "user-1234";
         if (result.rows.length > 0) {
           const multi = redisClient.multi();
-          const cartKey = `cart:user-${userId}`;
+          const cartKey = redisKey.cartKey(userId);
 
           for (const row of result.rows) {
             const { reservation_id, product_id } = row;
-
             const uuid = reservation_id.split("rev-")[1];
-
-            const reservationKey = `reservation:product:${product_id}:user-${userId}:rev-${uuid}`;
-
+            const reservationKey = redisKey.reservationKey(
+              product_id,
+              userId,
+              uuid
+            );
             multi.del(reservationKey);
             multi.srem(cartKey, reservation_id);
           }
