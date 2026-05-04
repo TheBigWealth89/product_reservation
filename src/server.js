@@ -53,10 +53,7 @@ app.use("/auth", authRoute);
 app.use("/product", productRouter);
 app.use("/admin", isAuthenticated, adminRouter);
 
-// Run socket.io
-httpServer.listen(3000, () => {
-  console.log("🚀 Server with Socket.IO is running on port 3000");
-});
+// Wait to start server until DB is connected
 
 // Connect & sync
 (async () => {
@@ -69,8 +66,8 @@ httpServer.listen(3000, () => {
       logger.error("⚠️ Sync failed at startup; continuing to boot:", syncErr);
     }
 
-    app.listen(port, () => {
-      logger.info(`🚀 Server running on http://localhost:${port}`);
+    httpServer.listen(port, () => {
+      logger.info(`🚀 Server with Socket.IO running on http://localhost:${port}`);
     });
   } catch (err) {
     logger.error("💥 Failed to start server:", err);

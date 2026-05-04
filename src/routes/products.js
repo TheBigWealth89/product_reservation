@@ -12,7 +12,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const router = express.Router();
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_placeholder", {
   apiVersion: "2025-08-27.basil",
 });
 
@@ -91,7 +91,7 @@ router.post("/:id/reserve", async (req, res) => {
     const cartEntry = redisKey.cartEntry(id, reservationId);
     const reservationKey = redisKey.reservationKey(id, userId, reservationId);
     const productAmount = result.rows[0].price;
-    const tenMinutesFromNow = new Date(Date.now() + 60000);
+    const tenMinutesFromNow = new Date(Date.now() + 600000);
 
     //Save to DB
     await pool.query(

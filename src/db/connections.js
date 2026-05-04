@@ -8,17 +8,17 @@ export const pool = new Pool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  port: process.env.DB_PORT,
-  ssl: { rejectUnauthorized: false },
+  port: process.env.DB_PORT || 5432,
+  ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
 });
 
 // --- Redis Connection ---
-const redisUrl = process.env.REDIS_URL;
+const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
 export const redisClient = new Redis(redisUrl, {
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
   rejectUnauthorized: true,
-  tls: redisUrl.startsWith("rediss//")
+  tls: redisUrl && redisUrl.startsWith("rediss://")
     ? { rejectUnauthorized: false }
     : undefined,
 });
