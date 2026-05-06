@@ -78,39 +78,49 @@ The application operates through two primary flows: the **Order Flow** and the *
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Quick Start with Docker (Recommended)
+
+The easiest way to get the entire system up and running is using Docker Compose. This will orchestrate the API server, all background workers, PostgreSQL, and Redis automatically.
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/TheBigWealth89/product_reservation.git
+    cd product_reservation
+    ```
+
+2.  **Start the system:**
+    ```bash
+    docker-compose up --build
+    ```
+
+The API will be available at `http://localhost:3000`. The database and Redis will be initialized and ready.
+
+---
+
+## 🛠️ Manual Setup & Installation
+
+If you prefer to run the components manually:
 
 ### Prerequisites
-
 - Node.js (v20+)
 - PostgreSQL
 - Redis
 - A free Stripe developer account
 
-### Setup & Installation
-
-1.  **Clone the repository:**
-
-    ```bash
-    git clone [https://github.com/TheBigWealth89/product_reservation.git](https://github.com/TheBigWealth89/product_reservation.git)
-    cd product_reservation
-    ```
-
-2.  **Install dependencies:**
-
+### Setup
+1.  **Install dependencies:**
     ```bash
     npm install
     ```
 
-3.  **Set up Environment Variables:**
-
+2.  **Set up Environment Variables:**
     - Create a `.env` file in the root of the project.
     - Copy the contents of `.env.example` into your new `.env` file.
     - Fill in your PostgreSQL, Redis, and **Stripe API keys**.
 
-4.  **Set up the database:**
+3.  **Set up the database:**
     - Create a PostgreSQL database with the name you specified in your `.env` file.
-    - Run the schema scripts in the `sql` directory to create the `products` and `orders` tables.
+    - Run the schema scripts in the `sql/init.sql` directory to create the `products` and `orders` tables.
 
 ---
 

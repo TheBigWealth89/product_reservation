@@ -4,7 +4,8 @@ import { createServer } from "http";
 import { initSockets } from "./sockets/index.js";
 import { syncInventoryToRedis } from "./db/sync-inventory.js";
 import session from "express-session";
-import { connectAll } from "./db/connections.js";
+import { RedisStore } from "connect-redis";
+import { redisClient, connectAll } from "./db/connections.js";
 import productRouter from "./routes/products.js";
 import adminRouter from "./routes/admin.js";
 import authRoute from "./routes/auth.route.js";
@@ -19,18 +20,31 @@ const app = express();
 const httpServer = createServer(app);
 initSockets(httpServer);
 
+// Health check endpoint for Docker/Kubernetes
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
 app.use("/", webhookRouter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Configure Redis Session Store
+const redisStore = new RedisStore({
+  client: redisClient,
+  prefix: "prs_sess:",
+});
+
 app.use(
   session({
+    store: redisStore,
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: false,
+      secure: false, // Set to true if using HTTPS
       httpOnly: true,
-      maxAge: 1000 * 60 * 60 * 24,
+      maxAge: 1000 * 60 * 60 * 24, // 1 day
     },
   })
 );

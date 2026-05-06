@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # 1. API Server
+  api-server:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    container_name: prs-api-server
+    restart: always
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    networks:
+      - prs-network
+
+  # 2. Fulfill Order Worker
+  fulfill-order-worker:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    container_name: prs-fulfill-worker
+    command: node src/workers/fulfillOrderWorker.js
+    restart: always
+    env_file:
+      - .env
+    networks:
+      - prs-network
+
+  # 3. Expires Worker
+  expires-worker:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    container_name: prs-expires-worker
+    command: node src/workers/expiresWorker.js
+    restart: always
+    env_file:
+      - .env
+    networks:
+      - prs-network
+
+  # 4. Cleanup Worker
+  cleanup-worker:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    container_name: prs-cleanup-worker
+    command: node src/workers/cleanupWorker.js
+    restart: always
+    env_file:
+      - .env
+    networks:
+      - prs-network
+
+networks:
+  prs-network:
+    driver: bridge
