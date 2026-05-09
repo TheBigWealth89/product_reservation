@@ -438,11 +438,11 @@ Source: [.example.env](file:///c:/Users/DELL/Desktop/Product-Reservation/product
 | `DB_NAME` | ✅ | PostgreSQL database name |
 | `DB_PORT` | ✅ | PostgreSQL port (default: 5432) |
 | `REDIS_URL` | ✅ | Redis connection URL |
-| `SESSION_SECRET` | ✅ | Express session encryption key |
-| `ADMIN_USERNAME` | ✅ | Admin dashboard username |
-| `ADMIN_PASS` | ✅ | Admin dashboard password |
-| `STRIPE_PUBLISHABLE_KEY` | ✅ | Stripe public key (client-side) |
-| `STRIPE_SECRET_KEY` | ✅ | Stripe secret key (server-side) |
+| `SESSION_SECRET` | ✅ | Express session encryption key (must be a non‑empty string, e.g. "super‑secret-key-12345") |
+| `ADMIN_USERNAME` | ✅ | Admin dashboard username (default "admin") |
+| `ADMIN_PASS` | ✅ | Admin dashboard password (default "password123") |
+| `STRIPE_PUBLISHABLE_KEY` | ✅ | Stripe public key (client‑side) |
+| `STRIPE_SECRET_KEY` | ✅ | Stripe secret key (server‑side) |
 | `STRIPE_WEBHOOK_SECRET` | ✅ | Stripe webhook signing secret |
 
 ### NPM Scripts
@@ -473,6 +473,8 @@ Source: [logger.js](file:///c:/Users/DELL/Desktop/Product-Reservation/product_re
 | `debug` | 4 | White |
 
 **Transports**:
+**Transports**:
+- In Docker, the `logs/` directory inside the container is mounted to the host via a bind‑mount (`./logs:/app/logs`). This ensures that `error.log` and `combined.log` are persisted on the host and visible in `product_reservation/logs`.
 - `logs/error.log` — errors only (JSON format)
 - `logs/combined.log` — all levels (JSON format)
 - Console — all levels, colorized (development only, suppressed in production)

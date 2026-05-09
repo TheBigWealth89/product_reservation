@@ -25,48 +25,76 @@ const colors = {
 
 winston.addColors(colors);
 
-// This format is much better for the console
+const SENSITIVE_KEYS = ["password", "token", "secret", "stripe_secret_key", "session_secret", "authorization", "cookie"];
+const STRIPE_REGEX = /(sk_test|sk_live)_[0-9a-zA-Z]+/g;
+const BEARER_REGEX = /Bearer\s+[A-Za-z0-9\-\._~\+\/]+=*/g;
+
+const redactSecrets = winston.format((info) => {
+  if (typeof info.message === 'string') {
+    info.message = info.message.replace(STRIPE_REGEX, '[STRIPE_KEY_REDACTED]');
+    info.message = info.message.replace(BEARER_REGEX, 'Bearer [TOKEN_REDACTED]');
+  }
+
+  const scrubObject = (obj) => {
+    if (!obj || typeof obj !== 'object') return;
+    for (let key in obj) {
+      if (SENSITIVE_KEYS.some(k => key.toLowerCase().includes(k))) {
+        obj[key] = '[REDACTED]';
+      } else if (typeof obj[key] === 'object') {
+        scrubObject(obj[key]);
+      }
+    }
+  };
+
+  scrubObject(info);
+  return info;
+});
+
+// This format is much better for the console in development
 const consoleFormat = winston.format.combine(
   winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
-  winston.format.colorize({ all: true }), // Colorize the entire log message
+  winston.format.colorize({ all: true }),
   winston.format.printf(
-    (info) => `${info.timestamp} [${info.level}]: ${info.message}`
+    (info) => {
+      const { timestamp, level, message, ...meta } = info;
+      const metaString = Object.keys(meta).length ? JSON.stringify(meta) : '';
+      return `${timestamp} [${level}]: ${message} ${metaString}`;
+    }
   )
 );
 
-// This format is better for files (JSON is standard)
+// This format is better for files and production console (JSON is standard)
 const fileFormat = winston.format.combine(
   winston.format.timestamp(),
-  winston.format.json() // Log as JSON in files
+  winston.format.json()
 );
 
 const transports = [
-  // Always log errors to a dedicated error file
   new winston.transports.File({
     filename: `${logDir}/error.log`,
     level: "error",
     format: fileFormat,
   }),
-  // Log everything to a combined file
   new winston.transports.File({
     filename: `${logDir}/combined.log`,
     format: fileFormat,
   }),
 ];
 
-// Only add the Console transport if we are NOT in production
-if (process.env.NODE_ENV !== "production") {
-  transports.push(
-    new winston.transports.Console({
-      level: 'debug', // Log everything to the console in dev
-      format: consoleFormat,
-    })
-  );
-}
+// Always add the Console transport for Docker logs
+transports.push(
+  new winston.transports.Console({
+    level: process.env.NODE_ENV === "production" ? "info" : "debug",
+    format: process.env.NODE_ENV === "production" ? fileFormat : consoleFormat,
+  })
+);
 
 const logger = winston.createLogger({
-  level: "info", // Default level if not specified in transport
+  level: "info",
   levels,
+  format: winston.format.combine(
+    redactSecrets()
+  ),
   transports,
 });
 
