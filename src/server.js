@@ -5,20 +5,21 @@ import { initSockets } from "./sockets/index.js";
 import { syncInventoryToRedis } from "./db/sync-inventory.js";
 import session from "express-session";
 import { RedisStore } from "connect-redis";
-import { redisClient, connectAll } from "./db/connections.js";
+import { redisClient, connectAll, pool } from "./db/connections.js";
 import productRouter from "./routes/products.js";
 import adminRouter from "./routes/admin.js";
 import authRoute from "./routes/auth.route.js";
 import webhookRouter from "./routes/webhook.js";
 import { isAuthenticated } from "./middleware/authenticate.js";
 import logger from "./utils/logger.js";
+import { registerShutdownHandlers } from "./utils/shutdown.js";
 import path from "path";
 import { fileURLToPath } from "url";
 
 const port = 3000;
 const app = express();
 const httpServer = createServer(app);
-initSockets(httpServer);
+const io = initSockets(httpServer);
 
 // Health check endpoint for Docker/Kubernetes
 app.get("/health", (req, res) => {
@@ -88,3 +89,11 @@ app.use("/admin", isAuthenticated, adminRouter);
     process.exit(1);
   }
 })();
+
+registerShutdownHandlers({
+  name: "API Server",
+  httpServer,
+  io,
+  dbPool: pool,
+  redisClient,
+});

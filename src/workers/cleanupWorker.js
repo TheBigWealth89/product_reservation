@@ -3,6 +3,7 @@ import returnStock from "../service/inventory.service.js";
 import logger from "../utils/logger.js";
 import purchaseQueue from "../queues/purchaseQueue.js";
 import cron from "node-cron";
+import { registerShutdownHandlers } from "../utils/shutdown.js";
 
 // This function contains the core logic of your old worker
 async function runCleanup() {
@@ -91,7 +92,15 @@ async function initialize() {
   const schedule = "*/20 * * * * *"; // Every 20 seconds for testing
   logger.info(`🚀 Cleanup scheduler started. Running every 20 seconds.`);
 
-  cron.schedule(schedule, runCleanup);
+  const task = cron.schedule(schedule, runCleanup);
+
+  registerShutdownHandlers({
+    name: "Cleanup Worker",
+    stopTimer: () => task.stop(),
+    queue: purchaseQueue,
+    dbPool: pool,
+    redisClient,
+  });
 }
 
 initialize();

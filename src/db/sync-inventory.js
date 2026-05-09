@@ -16,7 +16,7 @@ export const syncInventoryToRedis = async () => {
     logger.info(
       `Jobs - Waiting: ${waitingJobs.length}, Active: ${activeJobs.length}, Completed: ${completed.length}, Failed: ${failedJobs.length}`
     );
-   
+
     //Sync each product's inventory to redis
     const multi = redisClient.multi();
     for (const product of products) {
@@ -27,10 +27,12 @@ export const syncInventoryToRedis = async () => {
         `SELECT COUNT(*) 
          FROM orders 
          WHERE product_id = $1 
-           AND expires_at > NOW() 
            AND status = 'reserved'`,
         [product.id]
       );
+
+      console.log("Reservation result: ", reservationResult.rows[0].count);
+
 
       const pendingPayment = await pool.query(
         `SELECT COUNT(*) 
@@ -42,7 +44,7 @@ export const syncInventoryToRedis = async () => {
 
       const activePendingPayment = parseInt(pendingPayment.rows[0].count, 10);
       const activeReservations = parseInt(reservationResult.rows[0].count, 10);
-    
+
 
       // Calculate the true available inventory
       const availableInventory = Math.max(

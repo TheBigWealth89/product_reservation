@@ -18,6 +18,8 @@ export const initSockets = (httpServer) => {
       logger.error(`User disconnected ${reason}`);
     });
   });
+
+  return io; // Expose io so server.js can close it on shutdown
 };
 
 //Create thr redis subscriber

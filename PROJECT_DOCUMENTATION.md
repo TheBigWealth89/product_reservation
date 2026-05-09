@@ -473,7 +473,6 @@ Source: [logger.js](file:///c:/Users/DELL/Desktop/Product-Reservation/product_re
 | `debug` | 4 | White |
 
 **Transports**:
-**Transports**:
 - In Docker, the `logs/` directory inside the container is mounted to the host via a bind‑mount (`./logs:/app/logs`). This ensures that `error.log` and `combined.log` are persisted on the host and visible in `product_reservation/logs`.
 - `logs/error.log` — errors only (JSON format)
 - `logs/combined.log` — all levels (JSON format)
@@ -481,7 +480,21 @@ Source: [logger.js](file:///c:/Users/DELL/Desktop/Product-Reservation/product_re
 
 ---
 
-## 14. Testing & Load Testing
+## 14. Graceful Shutdown
+
+To prevent data corruption, orphaned jobs, and open connections, all four Node.js processes handle `SIGTERM` and `SIGINT` signals (e.g. from `docker stop` or `Ctrl+C`).
+
+**Shutdown Sequence:**
+1. **Stop Scheduling/Listeners**: `server.js` stops accepting HTTP requests, Socket.IO disconnects clients, and polling/cron jobs stop scheduling new work.
+2. **Drain Workers**: BullMQ workers stop accepting new jobs and wait for the currently executing job to resolve or reject (with a 20s timeout). Open Postgres transactions are rolled back.
+3. **Close Connections**: BullMQ queues, Postgres pools, and Redis clients are gracefully disconnected.
+4. **Timeout Guards**: An overarching 25s timeout ensures the process exits with an error if the shutdown hangs, preventing Docker's 30s `SIGKILL` from killing the process ungracefully.
+
+See `GRACEFUL_SHUTDOWN.md` for full implementation details.
+
+---
+
+## 15. Testing & Load Testing
 
 ### Concurrency Test — `test_concurrency.sh`
 Simulates 6 concurrent users (`user-A` through `user-F`) all attempting to reserve the same product simultaneously using parallel `curl` calls.
@@ -499,7 +512,7 @@ artillery run load-test.yml
 
 ---
 
-## 15. Fault Tolerance Patterns
+## 16. Fault Tolerance Patterns
 
 | Pattern | Implementation | Location |
 |---|---|---|
@@ -514,7 +527,7 @@ artillery run load-test.yml
 
 ---
 
-## 16. Known Issues & Observations
+## 17. Known Issues & Observations
 
 > [!NOTE]
 > **Resolved Issues**: During an initial code scan, critical issues such as dual port binding, SQL syntax errors, missing `logger` imports, missing `price` columns, and reservation TTL mismatches were found. **These have all been resolved.**
@@ -524,7 +537,7 @@ artillery run load-test.yml
 
 ---
 
-## 17. Dependency Summary
+## 18. Dependency Summary
 
 ### Production Dependencies
 

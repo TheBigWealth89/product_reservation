@@ -1,8 +1,9 @@
 import { Worker } from "bullmq";
 import { redisClient, pool } from "../db/connections.js";
 import logger from "../utils/logger.js";
+import { registerShutdownHandlers } from "../utils/shutdown.js";
 
-new Worker(
+const worker = new Worker(
   "fulfill-order",
   async (job) => {
     if (!job.data || !job.data.orderId) {
@@ -75,3 +76,10 @@ new Worker(
   },
   { connection: redisClient }
 );
+
+registerShutdownHandlers({
+  name: "Fulfill Order Worker",
+  worker,
+  dbPool: pool,
+  redisClient,
+});

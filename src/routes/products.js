@@ -91,7 +91,7 @@ router.post("/:id/reserve", async (req, res) => {
     const cartEntry = redisKey.cartEntry(id, reservationId);
     const reservationKey = redisKey.reservationKey(id, userId, reservationId);
     const productAmount = result.rows[0].price;
-    const tenMinutesFromNow = new Date(Date.now() + 600000);
+    const tenMinutesFromNow = new Date(Date.now() + 10000); // 10 seconds for testing
 
     //Save to DB
     await pool.query(
@@ -100,12 +100,11 @@ router.post("/:id/reserve", async (req, res) => {
     );
 
     // Set Redis reservation key with TTL
-    await redisClient.setex(reservationKey, 600, "reserved");
+    await redisClient.setex(reservationKey, 10, "reserved"); // 10 seconds for testing
 
-    // Add product to user's cart in Redis Set
-    await redisClient.sadd(cartKey, cartEntry);
+    await redisClient.rsadd(cartKey, cartEntry);
     logger.info(
-      `Product ${id} reserved for user ${userId}. Hold expires in 10 minutes.`
+      `Product ${id} reserved for user ${userId}. Hold expires in 10 seconds.`
     );
 
     logger.info(

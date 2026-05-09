@@ -41,7 +41,8 @@ export async function connectAll() {
   try {
     logger.info("🚀 Initializing all connections...");
 
-    await pool.connect();
+    // Test the PostgreSQL connection without checking out a persistent client
+    await pool.query("SELECT 1");
     logger.info("✅ PostgreSQL connected.");
     //Checking status because ioredis connects automatically
     if (redisClient.status !== "ready") {
