@@ -21,7 +21,7 @@ const app = express();
 const httpServer = createServer(app);
 const io = initSockets(httpServer);
 
-// Health check endpoint for Docker/Kubernetes
+// Health check endpoint for Docker
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
