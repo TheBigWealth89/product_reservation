@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { reserveLimiter, paymentLimiter } from '../middleware/rateLimiter.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const router = express.Router();
@@ -55,7 +56,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.post("/:id/reserve", async (req, res) => {
+router.post("/:id/reserve", reserveLimiter, async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query("SELECT * FROM products WHERE id = $1", [
@@ -193,7 +194,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.post("/create-payment-intent", async (req, res) => {
+router.post("/create-payment-intent", paymentLimiter, async (req, res) => {
   const userId = req.headers["x-user-id"] || "user-1234";
   const cartKey = redisKey.cartKey(userId);
   let client = null;

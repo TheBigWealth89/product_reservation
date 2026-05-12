@@ -87,6 +87,7 @@ product_reservation/
     │   └── sync-inventory.js     # Startup inventory sync (PG → Redis)
     ├── middleware/
     │   ├── authenticate.js       # Session-based admin auth guard
+    │   ├── rateLimiter.js        # Redis-backed express rate limiters
     │   └── verifyWebhookSignature.js  # Stripe webhook signature verify
     ├── routes/
     │   ├── products.js           # Product CRUD, reservation, checkout, payment
@@ -215,9 +216,9 @@ return {validItems, expiredItems}
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `GET` | `/product/:id` | None | Render product page with live inventory from Redis |
-| `POST` | `/product/:id/reserve` | `x-user-id` header | Atomically reserve 1 unit (Lua script) |
+| `POST` | `/product/:id/reserve` | `x-user-id` header | Atomically reserve 1 unit (Lua script) (Rate Limited: 10/15m) |
 | `GET` | `/product` | `x-user-id` header | Render checkout page with cart contents |
-| `POST` | `/product/create-payment-intent` | `x-user-id` header | Validate cart → create Stripe PaymentIntent |
+| `POST` | `/product/create-payment-intent` | `x-user-id` header | Validate cart → create Stripe PaymentIntent (Rate Limited: 3/1m) |
 
 ### Webhook Routes (`/`)
 
@@ -353,6 +354,12 @@ Simple BullMQ `Queue` named `"fulfill-order"` using the shared Redis connection.
 
 ### `authenticate.js`
 Session-based guard: checks `req.session.user`, redirects to `/admin/login` if absent.
+
+### `rateLimiter.js`
+Provides IP-based distributed rate limiters using `rate-limit-redis`:
+- `reserveLimiter`: Allows 10 requests per 15 minutes.
+- `paymentLimiter`: Allows 3 requests per 1 minute.
+Includes a JSON error handler and explicitly skips `/health` checks.
 
 ### `verifyWebhookSignature.js`
 - Initializes Stripe SDK with `STRIPE_SECRET_KEY`
@@ -517,6 +524,7 @@ artillery run load-test.yml
 | Pattern | Implementation | Location |
 |---|---|---|
 | **Atomic operations** | Redis Lua scripts | `decrement_inventory.lua`, `validate_cart.lua` |
+| **Distributed rate limiting**| `express-rate-limit` + Redis store | `rateLimiter.js` |
 | **Idempotent processing** | Status check before fulfillment | `fulfillOrderWorker.js` L37 |
 | **Row-level locking** | `SELECT ... FOR UPDATE` | `fulfillOrderWorker.js`, `admin.js` |
 | **Skip locked rows** | `FOR UPDATE SKIP LOCKED` | `expiresWorker.js` L23 |
@@ -547,8 +555,10 @@ artillery run load-test.yml
 | `dotenv` | ^17.2.0 | Environment variable loading |
 | `ejs` | ^3.1.10 | Server-side HTML templating |
 | `express` | ^5.1.0 | HTTP framework |
+| `express-rate-limit`| ^7.5.0 | Rate limiting middleware |
 | `express-session` | ^1.18.2 | Session middleware |
 | `ioredis` | ^5.7.0 | Redis client |
+| `rate-limit-redis`| ^4.2.0 | Redis store for rate limiting |
 | `node-cron` | ^4.2.1 | Cron scheduling |
 | `pg` | ^8.16.3 | PostgreSQL client |
 | `pool` | ^0.4.1 | Generic pooling (unused—`pg` has built-in Pool) |
