@@ -356,7 +356,7 @@ Simple BullMQ `Queue` named `"fulfill-order"` using the shared Redis connection.
 JWT-based guard: checks `req.cookies.token` or `Bearer` header, verifies JWT payload, sets `req.user`, and handles role-based authorization via `requireRole()`.
 
 ### `rateLimiter.js`
-Provides IP-based distributed rate limiters using `rate-limit-redis`:
+Provides user identity-based distributed rate limiters using `rate-limit-redis`:
 - `reserveLimiter`: Allows 10 requests per 15 minutes.
 - `paymentLimiter`: Allows 3 requests per 1 minute.
 Includes a JSON error handler and explicitly skips `/health` checks.

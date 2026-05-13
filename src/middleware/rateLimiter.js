@@ -13,9 +13,8 @@ const baseConfig = {
   standardHeaders: true, // sends RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset
   legacyHeaders: false,  // disables X-RateLimit-* (deprecated)
 
-  // Using IP for now to prevent header spoofing. 
-  // TODO: we will replace with verified JWT subject once real auth is added
-  keyGenerator: (req) => req.ip,
+  // Using the verified user ID from the authentication middleware.
+  keyGenerator: (req) => req.user?.id,
 
   // Custom JSON handler for API consistency
   handler: (req, res, next, options) => {

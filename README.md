@@ -61,7 +61,7 @@ The application operates through two primary flows: the **Order Flow** and the *
 - **Decoupled & Fault-Tolerant:** Uses **BullMQ** to process order fulfillment in the background. If the database is down, the job is automatically retried without being lost.
 - **Idempotent Workers:** The fulfillment worker is designed to be safely retried. It will never decrement stock twice for the same order, guaranteeing data consistency.
 - **Self-Healing Cleanup:** A polling-based background worker reliably finds and cancels expired reservations, returning stock to inventory.
-- **Rate Limiting:** Protects the endpoints from spam and exhaustion by rate limiting by IP across the distributed architecture using Redis.
+- **Rate Limiting:** Protects the endpoints from spam and exhaustion by rate limiting by authenticated user identity (JWT) across the distributed architecture using Redis.
 - **Admin Dashboard:** A web interface for monitoring failed jobs and allowing an administrator to manually retry or cancel a stuck purchase.
 
 ---
