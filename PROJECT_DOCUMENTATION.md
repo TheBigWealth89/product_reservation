@@ -501,7 +501,18 @@ See `GRACEFUL_SHUTDOWN.md` for full implementation details.
 
 ---
 
-## 15. Testing & Load Testing
+## 15. Observability & Health Probes
+
+The API server exposes three endpoints for health checking and observability:
+- `GET /health` - Liveness probe (checks process uptime)
+- `GET /ready` - Readiness probe (checks PostgreSQL, Redis, BullMQ status)
+- `GET /metrics` - Internal observability metrics (requires Admin)
+
+See [HEALTH.md](HEALTH.md) for detailed response schemas and implementation details.
+
+---
+
+## 16. Testing & Load Testing
 
 ### Concurrency Test — `test_concurrency.sh`
 Simulates 6 concurrent users (`user-A` through `user-F`) all attempting to reserve the same product simultaneously using parallel `curl` calls.
@@ -519,7 +530,7 @@ artillery run load-test.yml
 
 ---
 
-## 16. Fault Tolerance Patterns
+## 17. Fault Tolerance Patterns
 
 | Pattern | Implementation | Location |
 |---|---|---|
@@ -535,17 +546,14 @@ artillery run load-test.yml
 
 ---
 
-## 17. Known Issues & Observations
-
-> [!NOTE]
-> **Resolved Issues**: During an initial code scan, critical issues such as dual port binding, SQL syntax errors, missing `logger` imports, missing `price` columns, and reservation TTL mismatches were found. **These have all been resolved.**
+## 18. Known Issues & Observations
 
 > [!NOTE]
 > **Mock User DB**: The application currently uses a `MOCK_USERS` object in `auth.route.js`. This should be replaced with a real database user lookup table.
 
 ---
 
-## 18. Dependency Summary
+## 19. Dependency Summary
 
 ### Production Dependencies
 

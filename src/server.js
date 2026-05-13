@@ -14,16 +14,16 @@ import logger from "./utils/logger.js";
 import { registerShutdownHandlers } from "./utils/shutdown.js";
 import path from "path";
 import { fileURLToPath } from "url";
+import healthRouter from "./routes/health.route.js";
 
 const port = 3000;
 const app = express();
 const httpServer = createServer(app);
 const io = initSockets(httpServer);
 
-// Health check endpoint for Docker
-app.get("/health", (req, res) => {
-  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
-});
+// Health routes mounted first — must be reachable before auth and before
+// dependencies are confirmed healthy (readiness probe runs at startup)
+app.use("/", healthRouter);
 
 app.use(cookieParser());
 app.use("/", webhookRouter);
