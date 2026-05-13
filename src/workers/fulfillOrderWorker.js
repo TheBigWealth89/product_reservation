@@ -6,6 +6,7 @@ import { registerShutdownHandlers } from "../utils/shutdown.js";
 const worker = new Worker(
   "fulfill-order",
   async (job) => {
+    // Validate job data
     if (!job.data || !job.data.orderId) {
       logger.error(
         `Job ${job.id} failed: Invalid job data received.`,
@@ -15,9 +16,11 @@ const worker = new Worker(
       throw new Error("Invalid job data: missing orderId.");
     }
 
+    // Extract order ID from job data
     const { orderId } = job.data;
     logger.info(`Fulfilling order ${orderId}`);
 
+    // Database client
     let client;
     try {
       client = await pool.connect();

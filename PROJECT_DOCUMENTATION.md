@@ -29,7 +29,7 @@ A **production-grade, fault-tolerant** e-commerce reservation and payment system
 | Templating | EJS |
 | Logging | Winston (file + console) |
 | Scheduling | node-cron |
-| Session | express-session |
+| Authentication | JWT in HTTP-only Cookies |
 
 ---
 
@@ -86,13 +86,13 @@ product_reservation/
     │   ├── connections.js        # PostgreSQL Pool + Redis client exports
     │   └── sync-inventory.js     # Startup inventory sync (PG → Redis)
     ├── middleware/
-    │   ├── authenticate.js       # Session-based admin auth guard
+    │   ├── authenticate.js       # JWT cookie authentication & role guard
     │   ├── rateLimiter.js        # Redis-backed express rate limiters
     │   └── verifyWebhookSignature.js  # Stripe webhook signature verify
     ├── routes/
     │   ├── products.js           # Product CRUD, reservation, checkout, payment
     │   ├── admin.js              # Admin dashboard, retry/cancel failed jobs
-    │   ├── auth.route.js         # Admin login POST handler
+    │   ├── auth.route.js         # Unified login/logout & JWT issuing
     │   └── webhook.js            # Stripe webhook endpoint
     ├── service/
     │   └── inventory.service.js  # returnStock() — atomic Redis INCR + Pub/Sub
@@ -216,9 +216,9 @@ return {validItems, expiredItems}
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `GET` | `/product/:id` | None | Render product page with live inventory from Redis |
-| `POST` | `/product/:id/reserve` | `x-user-id` header | Atomically reserve 1 unit (Lua script) (Rate Limited: 10/15m) |
-| `GET` | `/product` | `x-user-id` header | Render checkout page with cart contents |
-| `POST` | `/product/create-payment-intent` | `x-user-id` header | Validate cart → create Stripe PaymentIntent (Rate Limited: 3/1m) |
+| `POST` | `/product/:id/reserve` | JWT Cookie / Bearer | Atomically reserve 1 unit (Lua script) (Rate Limited: 10/15m) |
+| `GET` | `/product` | JWT Cookie / Bearer | Render checkout page with cart contents |
+| `POST` | `/product/create-payment-intent` | JWT Cookie / Bearer | Validate cart → create Stripe PaymentIntent (Rate Limited: 3/1m) |
 
 ### Webhook Routes (`/`)
 
@@ -226,18 +226,18 @@ return {validItems, expiredItems}
 |---|---|---|---|
 | `POST` | `/webhook-stripe` | `express.raw()` + `verifyStripeWebhook` | Handle Stripe `payment_intent.succeeded` |
 
-### Auth Routes (`/auth`)
+### Auth Routes (mounted at `/`)
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/auth/admin/login` | Validate credentials against env vars, set session |
+| `GET` | `/login` | Render unified login page |
+| `POST` | `/login` | Validate credentials, issue JWT in httpOnly cookie |
+| `GET` | `/logout` | Clear JWT cookie, redirect |
 
 ### Admin Routes (`/admin`) — Requires session auth
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/admin/login` | Render login page |
-| `GET` | `/admin/logout` | Destroy session, redirect |
 | `GET` | `/admin/dashboard` | Paginated failed jobs list (10/page) |
 | `POST` | `/admin/jobs/:jobId/retry` | Retry a failed BullMQ job |
 | `POST` | `/admin/jobs/:jobId/cancel` | Cancel order, return stock, remove job |
@@ -253,7 +253,7 @@ Startup sequence:
 2. Create Express app + HTTP server
 3. Initialize Socket.IO via `initSockets(httpServer)`
 4. Mount webhook route **before** `express.json()` (Stripe needs raw body)
-5. Configure session middleware (24h cookie, httpOnly)
+5. Configure cookie-parser middleware
 6. Set up EJS view engine
 7. Mount auth, product, and admin routes
 8. Start Socket.IO server on port 3000
@@ -353,7 +353,7 @@ Simple BullMQ `Queue` named `"fulfill-order"` using the shared Redis connection.
 ## 9. Middleware
 
 ### `authenticate.js`
-Session-based guard: checks `req.session.user`, redirects to `/admin/login` if absent.
+JWT-based guard: checks `req.cookies.token` or `Bearer` header, verifies JWT payload, sets `req.user`, and handles role-based authorization via `requireRole()`.
 
 ### `rateLimiter.js`
 Provides IP-based distributed rate limiters using `rate-limit-redis`:
@@ -378,7 +378,7 @@ Includes a JSON error handler and explicitly skips `/health` checks.
 | `product.ejs` | `/product/:id` | Real-time inventory via Socket.IO, reserve button, link to checkout |
 | `orderPage.ejs` | `/product` | Cart summary with quantities, Stripe Elements card input, PaymentIntent flow |
 | `dashboard.ejs` | `/admin/dashboard` | Paginated failed jobs table, retry/cancel buttons per job |
-| `login.ejs` | `/admin/login` | Username/password form, error display |
+| `login.ejs` | `/login` | Unified username/password form, error display |
 
 ### Real-Time Client Flow (product.ejs)
 1. Load `socket.io.js` client
@@ -445,7 +445,7 @@ Source: [.example.env](file:///c:/Users/DELL/Desktop/Product-Reservation/product
 | `DB_NAME` | ✅ | PostgreSQL database name |
 | `DB_PORT` | ✅ | PostgreSQL port (default: 5432) |
 | `REDIS_URL` | ✅ | Redis connection URL |
-| `SESSION_SECRET` | ✅ | Express session encryption key (must be a non‑empty string, e.g. "super‑secret-key-12345") |
+| `JWT_SECRET` | ✅ | JWT encryption key (must be a non‑empty string, e.g. "super‑secret-key-12345") |
 | `ADMIN_USERNAME` | ✅ | Admin dashboard username (default "admin") |
 | `ADMIN_PASS` | ✅ | Admin dashboard password (default "password123") |
 | `STRIPE_PUBLISHABLE_KEY` | ✅ | Stripe public key (client‑side) |
@@ -541,7 +541,7 @@ artillery run load-test.yml
 > **Resolved Issues**: During an initial code scan, critical issues such as dual port binding, SQL syntax errors, missing `logger` imports, missing `price` columns, and reservation TTL mismatches were found. **These have all been resolved.**
 
 > [!NOTE]
-> **Hardcoded user ID**: The `x-user-id` header falls back to `"user-1234"` throughout. No real authentication layer for customers exists yet.
+> **Mock User DB**: The application currently uses a `MOCK_USERS` object in `auth.route.js`. This should be replaced with a real database user lookup table.
 
 ---
 
@@ -556,7 +556,8 @@ artillery run load-test.yml
 | `ejs` | ^3.1.10 | Server-side HTML templating |
 | `express` | ^5.1.0 | HTTP framework |
 | `express-rate-limit`| ^7.5.0 | Rate limiting middleware |
-| `express-session` | ^1.18.2 | Session middleware |
+| `cookie-parser` | ^1.4.6 | Cookie parsing middleware |
+| `jsonwebtoken` | ^9.0.2 | JWT signing and verification |
 | `ioredis` | ^5.7.0 | Redis client |
 | `rate-limit-redis`| ^4.2.0 | Redis store for rate limiting |
 | `node-cron` | ^4.2.1 | Cron scheduling |

@@ -36,7 +36,7 @@ router.get("/dashboard", async (req, res) => {
       jobs: failedJobs,
       currentPage: page,
       totalPages: Math.ceil(total.failed / pageSize),
-      user: req.session.user,
+      user: req.user,
     });
   } catch (err) {
     logger.error("Dashboard error:", err);
@@ -61,7 +61,7 @@ router.post("/jobs/:jobId/retry", async (req, res) => {
 
     await job.retry();
     logger.info(`Admin retried job ${jobId}`, {
-      user: req.session.user.username,
+      user: req.user.id,
     });
     res.redirect("/admin/dashboard");
   } catch (err) {
@@ -124,7 +124,7 @@ router.post("/jobs/:jobId/cancel", async (req, res) => {
     await client.query("COMMIT");
     await job.remove();
     logger.info(`Admin cancelled job ${jobId}`, {
-      user: req.session.user.username,
+      user: req.user.id,
     });
 
     res.redirect("/admin/dashboard");

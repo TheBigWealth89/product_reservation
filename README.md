@@ -46,7 +46,7 @@ The application operates through two primary flows: the **Order Flow** and the *
   1.  **Atomic Operations:** Lua scripts ensure inventory checks are race-condition-proof.
   2.  **Job Queue (BullMQ):** Reliably queues order fulfillment jobs for background processing.
   3.  **Pub/Sub Messaging:** Serves as a high-speed message bus between workers and the API server for real-time updates.
-  4.  **Session & Cart Storage:** Provides a fast cache for user data.
+  4.  **Cart Storage:** Provides a fast cache for user cart data.
 - **PostgreSQL (The Source of Truth):** The permanent, relational database that stores all product, inventory, and order data with transactional integrity.
 - **Stripe Integration:** Securely handles all sensitive payment information off-site, communicating with the backend via verified webhooks to confirm transactions.
 - **Background Workers:** Independent Node.js processes that handle specific, long-running tasks (order fulfillment, reservation expiration, cleanup worker), allowing the system to scale and remain resilient.

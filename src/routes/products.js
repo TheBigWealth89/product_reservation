@@ -63,8 +63,8 @@ router.post("/:id/reserve", reserveLimiter, async (req, res) => {
       id,
     ]);
 
-    // Assuming this would come from authentication section
-    const userId = req.headers["x-user-id"] || "user-1234";
+    // User ID from authentication middleware
+    const userId = req.user.id;
     const inventoryKey = redisKey.inventoryKey(id);
     const cartKey = redisKey.cartKey(userId);
 
@@ -127,7 +127,7 @@ router.post("/:id/reserve", reserveLimiter, async (req, res) => {
 
 router.get("/", async (req, res) => {
   try {
-    const userId = req.headers["x-user-id"] || "user-1234";
+    const userId = req.user.id;
     const cartKey = redisKey.cartKey(userId);
 
     //Get all item IDs from the user's cart in Redis
@@ -195,7 +195,7 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/create-payment-intent", paymentLimiter, async (req, res) => {
-  const userId = req.headers["x-user-id"] || "user-1234";
+  const userId = req.user.id;
   const cartKey = redisKey.cartKey(userId);
   let client = null;
   let successfulItems = [];
