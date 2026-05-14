@@ -13,6 +13,9 @@ RUN npm ci
 # Copy the rest of the application code
 COPY . .
 
+# Prune devDependencies for a smaller production image
+RUN npm prune --production
+
 # Stage 2: Production Runtime
 FROM node:20-alpine AS runner
 
@@ -21,13 +24,17 @@ WORKDIR /app
 # Set production environment
 ENV NODE_ENV=production
 
-# Copy only necessary files
+# Copy package files
 COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/*.lua ./
 
-# Install only production dependencies
-RUN npm ci --only=production
+# Copy production node_modules from builder
+COPY --from=builder /app/node_modules ./node_modules
+
+# Copy application source
+COPY --from=builder /app/src ./src
+
+# Copy any lua scripts if they exist (used by Redis/BullMQ)
+COPY --from=builder /app/*.lua ./
 
 # Workers do not expose ports by default
 # Start the worker directly with node
