@@ -12,7 +12,7 @@ A **production-grade, fault-tolerant** e-commerce reservation and payment system
 |---|---|
 | **Race Conditions** | Redis Lua scripts for atomic inventory operations |
 | **System Failures** | BullMQ with retry + idempotent workers |
-| **Abandoned Carts** | Polling-based expiration worker (30s interval) |
+| **Abandoned Carts** | Polling-based expiration worker (10-minute TTL) |
 | **Stale UIs** | Socket.IO + Redis Pub/Sub for real-time updates |
 
 ### Tech Stack
@@ -30,6 +30,8 @@ A **production-grade, fault-tolerant** e-commerce reservation and payment system
 | Logging | Winston (file + console) |
 | Scheduling | node-cron |
 | Authentication | JWT in HTTP-only Cookies |
+| Development | Docker Compose Watch + Node.js --watch |
+
 
 ---
 
@@ -47,7 +49,7 @@ graph TD
     W1 -->|SQL transactions| PG
     W2["expiresWorker"] -->|Polls every 30s| PG
     W2 -->|INCR + Pub/Sub| R
-    W3["cleanupWorker"] -->|Cron every 20s| PG
+    W3["cleanupWorker"] -->|Cron every 10s| PG
     W3 -->|INCR + Pub/Sub| R
 ```
 
@@ -265,6 +267,10 @@ Startup sequence:
 ### 7.2 Database Connections — [connections.js](file:///c:/Users/DELL/Desktop/Product-Reservation/product_reservation/src/db/connections.js)
 
 - **PostgreSQL**: `pg.Pool` with SSL (`rejectUnauthorized: false`)
+  - `max`: 5 connections
+  - `min`: 1 connection
+  - `idleTimeoutMillis`: 30,000ms
+  - `connectionTimeoutMillis`: 10,000ms
 - **Redis**: `ioredis` with TLS auto-detection based on `rediss://` prefix
 - **`connectAll()`**: Idempotent function (uses `isConnected` flag), connects PG pool, waits for Redis ready state
 - Exports: `pool`, `redisClient`, `connectAll()`
@@ -310,6 +316,9 @@ Simple BullMQ `Queue` named `"fulfill-order"` using the shared Redis connection.
 - **Trigger**: Stripe webhook adds jobs after `payment_intent.succeeded`
 - **Job config**: 3 attempts, 1s fixed backoff, `removeOnComplete: true`, `removeOnFail: false`
 
+> [!IMPORTANT]
+> **Fault Tolerance**: The worker is fully idempotent. It checks the database status before processing to ensure it never decrements inventory twice for the same order.
+
 **Processing logic**:
 1. Validate `job.data.orderId` exists
 2. `BEGIN` transaction, `SELECT ... FOR UPDATE` (row lock)
@@ -336,7 +345,7 @@ Simple BullMQ `Queue` named `"fulfill-order"` using the shared Redis connection.
 
 ### 8.3 Cleanup Worker — [cleanupWorker.js](file:///c:/Users/DELL/Desktop/Product-Reservation/product_reservation/src/workers/cleanupWorker.js)
 
-- **Type**: Cron-based (every 20 seconds via `node-cron`)
+- **Type**: Cron-based (every 10 seconds via `node-cron`)
 - **Distributed lock**: `SET cleanup-lock running NX EX 300` (prevents parallel runs)
 
 **Processing logic**:
@@ -422,6 +431,9 @@ sequenceDiagram
 
     U->>S: stripe.confirmCardPayment()
     S->>API: POST /webhook-stripe (payment_intent.succeeded)
+    Note over API: 1. Verify User ID in Metadata vs DB
+    Note over API: 2. If mismatch, return 200 + warning (abort)
+    Note over API: 3. If error, return 500 (trigger Stripe retry)
     API->>R: purchaseQueue.add("fulfill-order")
     API->>R: DEL reservation keys, SREM cart
 
@@ -431,7 +443,24 @@ sequenceDiagram
 
 ---
 
-## 12. Configuration
+## 12. Development Workflow
+
+### Docker Compose Watch
+For a real-time development experience where changes to your `src/` directory are instantly synced into the containers:
+
+```bash
+# Start the system with hot-reloading
+docker compose up --watch
+```
+
+This configuration uses the native Node.js `--watch` flag inside the containers to restart the internal processes without killing the container itself, making development much faster and more stable.
+
+### System Reset
+To clear all data and start as "fresh" (deletes all orders and flushes Redis):
+
+```bash
+node clear-system.js
+```
 
 ### Environment Variables
 
@@ -542,6 +571,8 @@ artillery run load-test.yml
 | **Compensation logic** | Revert to `reserved` on payment failure | `products.js` L275-311 |
 | **Distributed locking** | Redis `SET NX EX` | `cleanupWorker.js` L13 |
 | **Automatic retry** | BullMQ 3 attempts, 1s backoff | `webhook.js` L29-33 |
+| **Webhook Retries** | Return 500 on failure | `webhook.js` L79 |
+| **Identity Validation**| Stripe Metadata vs DB User ID | `webhook.js` L51-55 |
 | **Graceful degradation** | Sync failure doesn't block startup | `server.js` L68-70 |
 
 ---

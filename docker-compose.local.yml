@@ -1,0 +1,181 @@
+# ============================================================
+#  LOCAL DEVELOPMENT — Docker Compose
+#
+#  Runs:  PostgreSQL + Redis locally + all app containers
+#  Uses:  .env.local  (NOT .env — cloud/prod file stays untouched)
+#
+#  Commands:
+#    Start:    docker compose -f docker-compose.local.yml up --watch
+#    Rebuild:  docker compose -f docker-compose.local.yml up --build --watch
+#    Teardown: docker compose -f docker-compose.local.yml down -v
+#
+#  DO NOT modify docker-compose.yml — that file stays for cloud/prod
+# ============================================================
+
+services:
+
+  # ── 1. PostgreSQL ──────────────────────────────────────────
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: prs-local-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: prs_user
+      POSTGRES_PASSWORD: prs_pass
+      POSTGRES_DB: prs_db
+    ports:
+      - "5433:5432" # expose so you can connect with psql / DBeaver / etc.
+    volumes:
+      - prs-postgres-data:/var/lib/postgresql/data # persist data across restarts
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql # auto-run schema on first boot
+    networks:
+      - prs-local-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U prs_user -d prs_db" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── 2. Redis ───────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: prs-local-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379" # expose so you can connect with redis-cli / RedisInsight
+    volumes:
+      - prs-redis-data:/data # persist Redis data across restarts
+    networks:
+      - prs-local-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── 3. API Server ──────────────────────────────────────────
+  api-server:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    container_name: prs-local-api-server
+    command: node --watch src/server.js
+    restart: unless-stopped
+    stop_grace_period: 30s
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.local
+    volumes:
+      - ./src:/app/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - prs-local-network
+    develop:
+      watch:
+        - path: ./src
+          target: /app/src
+          action: sync
+        - path: ./package.json
+          action: rebuild
+
+  # ── 4. Fulfill Order Worker ────────────────────────────────
+  fulfill-order-worker:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    container_name: prs-local-fulfill-worker
+    command: node --watch src/workers/fulfillOrderWorker.js
+    restart: unless-stopped
+    stop_grace_period: 30s
+    env_file:
+      - .env.local
+    volumes:
+      - ./src:/app/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - prs-local-network
+    develop:
+      watch:
+        - path: ./src
+          target: /app/src
+          action: sync
+        - path: ./package.json
+          action: rebuild
+
+  # ── 5. Expires Worker ─────────────────────────────────────
+  expires-worker:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    container_name: prs-local-expires-worker
+    command: node --watch src/workers/expiresWorker.js
+    restart: unless-stopped
+    stop_grace_period: 30s
+    env_file:
+      - .env.local
+    volumes:
+      - ./src:/app/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - prs-local-network
+    develop:
+      watch:
+        - path: ./src
+          target: /app/src
+          action: sync
+        - path: ./package.json
+          action: rebuild
+
+  # ── 6. Cleanup Worker ─────────────────────────────────────
+  cleanup-worker:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    container_name: prs-local-cleanup-worker
+    command: node --watch src/workers/cleanupWorker.js
+    restart: unless-stopped
+    stop_grace_period: 30s
+    env_file:
+      - .env.local
+    volumes:
+      - ./src:/app/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - prs-local-network
+    develop:
+      watch:
+        - path: ./src
+          target: /app/src
+          action: sync
+        - path: ./package.json
+          action: rebuild
+
+# ── Named Volumes (local only, prefixed to avoid collisions) ─
+volumes:
+  prs-postgres-data:
+    name: prs-local-postgres-data
+  prs-redis-data:
+    name: prs-local-redis-data
+
+# ── Network (isolated from prod prs-network) ─────────────────
+networks:
+  prs-local-network:
+    driver: bridge
+    name: prs-local-network

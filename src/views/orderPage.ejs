@@ -1,37 +1,178 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <title>Checkout</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Reservation | Checkout</title>
     <script src="https://js.stripe.com/v3/"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background-color: #f4f7f9; margin: 0; padding: 20px; box-sizing: border-box; }
-        .checkout-container { width: 100%; max-width: 450px; }
-        .summary, .payment-form { padding: 30px; background: #fff; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .summary { margin-bottom: 20px; }
-        h3 { margin-top: 0; color: #333; }
-        ul { list-style: none; padding: 0; margin: 0 0 20px 0; }
-        li { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
-        li:last-child { border-bottom: none; }
-        .total { font-weight: bold; font-size: 1.2em; display: flex; justify-content: space-between; padding-top: 15px; border-top: 2px solid #333; }
-        #card-element { border: 1px solid #ccc; padding: 12px; border-radius: 4px; margin-bottom: 20px; }
-        button { width: 100%; padding: 14px; background-color: #6772e5; color: white; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background-color 0.2s; }
-        button:hover { background-color: #5469d4; }
-        button:disabled { background-color: #a9b3f9; cursor: not-allowed; }
-        #payment-message { margin-top: 15px; text-align: center; font-weight: bold; }
+        :root {
+            --bg-dark: #0a0a0c;
+            --bg-card: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --accent-primary: linear-gradient(135deg, #00f2ff 0%, #0072ff 100%);
+            --text-bright: #ffffff;
+            --text-dim: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at bottom left, #1a1a2e, var(--bg-dark));
+            color: var(--text-bright);
+            min-height: 100vh;
+        }
+
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 40px;
+            background: rgba(10, 10, 12, 0.7);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--glass-border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-weight: 800;
+            font-size: 1.5rem;
+            background: var(--accent-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-decoration: none;
+        }
+
+        .nav-links a {
+            color: var(--text-dim);
+            text-decoration: none;
+            margin-left: 25px;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .logout-btn {
+            border: 1px solid var(--glass-border);
+            padding: 8px 16px;
+            border-radius: 50px;
+        }
+
+        .checkout-container {
+            max-width: 500px;
+            margin: 60px auto;
+            padding: 0 20px;
+        }
+
+        .summary,
+        .payment-form {
+            background: var(--bg-card);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 30px;
+            backdrop-filter: blur(20px);
+            margin-bottom: 25px;
+        }
+
+        h3 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            letter-spacing: -0.5px;
+        }
+
+        ul {
+            list-style: none;
+            margin-bottom: 25px;
+        }
+
+        li {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--glass-border);
+            color: var(--text-dim);
+        }
+
+        .total {
+            font-weight: 700;
+            font-size: 1.3rem;
+            display: flex;
+            justify-content: space-between;
+            padding-top: 15px;
+            color: var(--text-bright);
+        }
+
+        #card-element {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid var(--glass-border);
+            margin-bottom: 25px;
+        }
+
+        button {
+            width: 100%;
+            padding: 18px;
+            background: var(--accent-primary);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 12px rgba(0, 242, 255, 0.1);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 242, 255, 0.3);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #payment-message {
+            margin-top: 20px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
     </style>
 </head>
+
 <body>
+    <nav>
+        <a href="/product" class="logo">PRODUCT RESERVE</a>
+        <div class="nav-links">
+            <a href="/logout" class="logout-btn">Logout</a>
+        </div>
+    </nav>
+
     <div class="checkout-container">
         <div class="summary">
             <h3>Order Summary</h3>
             <ul>
-                <% cartItems.forEach(item => { %>
+                <% cartItems.forEach(item=> { %>
                     <li>
-                        <span><%= item.name %></span>
+                        <span>
+                            <%= item.name %>
+                        </span>
                         <span>$<%= item.price %></span>
                     </li>
-                <% }) %>
+                    <% }) %>
             </ul>
             <div class="total">
                 <span>Total</span>
@@ -40,34 +181,50 @@
         </div>
 
         <div class="payment-form">
-            <h3>Pay with Card</h3>
+            <h3>Secure Payment</h3>
             <div id="card-element"></div>
-            <button id="submit-button">Pay $<%= totalAmountForDisplay %></button>
+            <button id="submit-button">Confirm Payment</button>
             <div id="payment-message"></div>
         </div>
     </div>
 
     <script>
         const stripe = Stripe('<%= stripePublishableKey %>');
-        const cardElement = stripe.elements().create('card');
+        const elements = stripe.elements();
+        const style = {
+            base: {
+                color: "#ffffff",
+                fontFamily: 'Inter, sans-serif',
+                fontSmoothing: "antialiased",
+                fontSize: "16px",
+                "::placeholder": { color: "#94a3b8" }
+            },
+            invalid: { color: "#ff4d4d", iconColor: "#ff4d4d" }
+        };
+        const cardElement = elements.create('card', { style });
         cardElement.mount('#card-element');
 
         const submitButton = document.getElementById('submit-button');
         const messageDiv = document.getElementById('payment-message');
-        // const totalAmountInCents = <%= totalAmountInCents %>;
 
         submitButton.addEventListener('click', async () => {
             submitButton.disabled = true;
-            messageDiv.textContent = 'Processing...';
+            messageDiv.style.color = "#ffffff";
+            messageDiv.textContent = 'Verifying payment...';
 
-            // Use the /order/create-payment-intent route now
             const response = await fetch('/product/create-payment-intent', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
             });
 
             if (!response.ok) {
-                messageDiv.textContent = 'Error: Could not start payment.';
+                const errorData = await response.json();
+                messageDiv.style.color = "#ff4d4d";
+                if (errorData.expired_or_invalid && errorData.expired_or_invalid.length > 0) {
+                    messageDiv.textContent = 'Reservation expired. Please go back and reserve the item again.';
+                } else {
+                    messageDiv.textContent = 'Validation failed. Your cart might be empty.';
+                }
                 submitButton.disabled = false;
                 return;
             }
@@ -79,13 +236,15 @@
             });
 
             if (error) {
-                messageDiv.textContent = `Error: ${error.message}`;
+                messageDiv.style.color = "#ff4d4d";
+                messageDiv.textContent = `${error.message}`;
                 submitButton.disabled = false;
             } else if (paymentIntent.status === 'succeeded') {
-                messageDiv.textContent = '✅ Payment Successful!';
-                // Button remains disabled after success
+                messageDiv.style.color = "#00f2ff";
+                messageDiv.textContent = 'Payment Successful! Order secured.';
             }
         });
     </script>
 </body>
+
 </html>

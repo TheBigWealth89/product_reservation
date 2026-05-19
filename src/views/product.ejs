@@ -1,75 +1,334 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>Product Reservation</title>
-    <!-- <link rel="stylesheet" href="../public/style.css" /> -->
+<html lang="en">
 
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        margin: 20px;
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Product Reservation | <%= product.name %>
+  </title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0a0a0c;
+      --bg-card: rgba(255, 255, 255, 0.02);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --accent-primary: linear-gradient(135deg, #00f2ff 0%, #0072ff 100%);
+      --text-bright: #ffffff;
+      --text-dim: #94a3b8;
+      --success: #00f2ff;
+      --error: #ff4d4d;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: radial-gradient(circle at top right, #1e1e2e, var(--bg-dark));
+      color: var(--text-bright);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Navigation */
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 40px;
+      background: rgba(10, 10, 12, 0.7);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--glass-border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      font-weight: 800;
+      font-size: 1.5rem;
+      background: var(--accent-primary);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -1px;
+      text-decoration: none;
+    }
+
+    .nav-links a {
+      color: var(--text-dim);
+      text-decoration: none;
+      margin-left: 25px;
+      font-weight: 500;
+      font-size: 0.9rem;
+      transition: color 0.3s;
+    }
+
+    .nav-links a:hover {
+      color: var(--text-bright);
+    }
+
+    .logout-btn {
+      border: 1px solid var(--glass-border);
+      padding: 8px 16px;
+      border-radius: 50px;
+    }
+
+    /* Main Content */
+    .main-container {
+      max-width: 1000px;
+      margin: 60px auto;
+      padding: 0 20px;
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 60px;
+      align-items: center;
+    }
+
+    .product-visual {
+      background: var(--bg-card);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .product-visual img {
+      max-width: 80%;
+      transform: rotate(-5deg);
+      filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.8));
+    }
+
+    .info-card {
+      background: var(--bg-card);
+      padding: 40px;
+      border-radius: 32px;
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(20px);
+    }
+
+    h1 {
+      font-size: 3rem;
+      font-weight: 800;
+      margin-bottom: 15px;
+      letter-spacing: -1.5px;
+    }
+
+    .description {
+      color: var(--text-dim);
+      line-height: 1.6;
+      margin-bottom: 30px;
+      font-size: 1.1rem;
+    }
+
+    .stats {
+      display: flex;
+      gap: 40px;
+      margin-bottom: 40px;
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      margin-bottom: 5px;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #00f2ff;
+    }
+
+    .reserve-btn {
+      width: 100%;
+      padding: 20px;
+      background: var(--accent-primary);
+      border: none;
+      border-radius: 16px;
+      color: white;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 12px rgba(0, 114, 255, 0.2);
+    }
+
+    .reserve-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0, 114, 255, 0.3);
+    }
+
+    .reserve-btn:active {
+      transform: translateY(0);
+    }
+
+    /* Message Notification Style */
+    #message-box {
+      margin-top: 25px;
+      padding: 15px 20px;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      display: none;
+      align-items: center;
+      gap: 12px;
+      border: 1px solid transparent;
+      animation: slideUp 0.3s ease-out;
+    }
+
+    #message-box.success {
+      display: flex;
+      background: rgba(0, 242, 255, 0.1);
+      border-color: rgba(0, 242, 255, 0.2);
+      color: var(--success);
+    }
+
+    #message-box.error {
+      display: flex;
+      background: rgba(255, 77, 77, 0.1);
+      border-color: rgba(255, 77, 77, 0.2);
+      color: var(--error);
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
       }
-      button {
-        padding: 10px 20px;
-        background-color: #007bff;
-        color: white;
-        border: none;
-        cursor: pointer;
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
       }
-      button:hover {
-        background-color: #0056b3;
-      }
-    </style>
-  </head>
-  <body>
-    <h1>Product: <%= product.name %></h1>
-    <p>Description: <%= product.description %></p>
-    <p>Inventory: <span id="inventory"><%= product.inventory %></span></p>
-    <button onclick="reserveProduct('<%= product.id %>')">Reserve</button>
-    <p id="message"></p>
-    <a href="/product"><h4>Checkout</h4></a>
+    }
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-      const productId = window.location.pathname.split("/").pop();
-      const inventorySpan = document.getElementById("inventory");
-      const messageP = document.getElementById("message");
+    .checkout-link {
+      display: block;
+      text-align: center;
+      margin-top: 25px;
+      color: var(--text-bright);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.9rem;
+      opacity: 0.8;
+      transition: opacity 0.3s;
+    }
 
-      //Create a socket connection
-      const socket = io();
+    .checkout-link:hover {
+      opacity: 1;
+      text-decoration: underline;
+    }
+  </style>
+</head>
 
-      // As soon we connect join right room
-      socket.on("connect", () => {
-        console.log(
-          "Connected to server, joining room for product:",
-          productId
-        );
-        // Tell the server which product page this user is viewing.
-        socket.emit("join-product-room", productId);
-      });
+<body>
+  <nav>
+    <a href="/product" class="logo">PRODUCT RESERVE</a>
+    <div class="nav-links">
+      <a href="/logout" class="logout-btn">Logout</a>
+    </div>
+  </nav>
 
-      socket.on("inventory-update", (newInventory) => {
-        console.log("NewInventory successfully updated", newInventory);
-        inventorySpan.innerText = newInventory;
-      });
+  <div class="main-container">
+    <div class="product-visual">
+      <img src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&auto=format&fit=crop" alt="Product" />
+    </div>
 
-      async function reserveProduct(id) {
-        try {
-          const response = await fetch(`/product/${id}/reserve`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-          });
-          const data = await response.json();
-          if (response.ok) {
-            inventorySpan.textContent = data.inventory;
-            messageP.textContent = data.message;
-          } else {
-            messageP.textContent = data.error;
-          }
-        } catch (err) {
-          messageP.textContent = "Error reserving product";
+    <div class="info-card">
+      <h1>
+        <%= product.name %>
+      </h1>
+      <p class="description">
+        <%= product.description %>
+      </p>
+
+      <div class="stats">
+        <div class="stat-item">
+          <span class="stat-label">In Stock</span>
+          <span class="stat-value" id="inventory">
+            <%= product.inventory %>
+          </span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Price</span>
+          <span class="stat-value">$<%= product.price %></span>
+        </div>
+      </div>
+
+      <button class="reserve-btn" onclick="reserveProduct('<%= product.id %>')">Reserve</button>
+
+      <div id="message-box"></div>
+
+      <a href="/product" class="checkout-link">Go to Checkout &rarr;</a>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const productId = window.location.pathname.split("/").pop();
+    const inventorySpan = document.getElementById("inventory");
+    const messageBox = document.getElementById("message-box");
+
+    const socket = io();
+
+    socket.on("connect", () => {
+      socket.emit("join-product-room", productId);
+    });
+
+    socket.on("inventory-update", (newInventory) => {
+      inventorySpan.innerText = newInventory;
+      inventorySpan.style.transition = 'none';
+      inventorySpan.style.color = '#0072ff';
+      setTimeout(() => {
+        inventorySpan.style.transition = 'color 0.5s';
+        inventorySpan.style.color = '#00f2ff';
+      }, 100);
+    });
+
+    async function reserveProduct(id) {
+      const btn = document.querySelector('.reserve-btn');
+      btn.disabled = true;
+      messageBox.style.display = 'none';
+
+      try {
+        const response = await fetch(`/product/${id}/reserve`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+        const data = await response.json();
+
+        messageBox.className = response.ok ? 'success' : 'error';
+        messageBox.innerHTML = response.ok ? '<span> Reservation Successful!</span>' : `<span> ${data.error}</span>`;
+        messageBox.style.display = 'flex';
+
+        if (response.ok) {
+          inventorySpan.textContent = data.inventory;
         }
+      } catch (err) {
+        messageBox.className = 'error';
+        messageBox.innerHTML = '<span> Network Error</span>';
+        messageBox.style.display = 'flex';
+      } finally {
+        btn.disabled = false;
       }
-    </script>
-  </body>
+    }
+  </script>
+</body>
+
 </html>

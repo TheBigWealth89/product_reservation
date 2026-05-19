@@ -20,7 +20,6 @@ authRoute.post("/login", (req, res) => {
   if (user && user.password === password) {
     const payload = { sub: user.id, role: user.role };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "24h" });
-    // logger.info("Token", token);
 
     res.cookie("token", token, {
       httpOnly: true,

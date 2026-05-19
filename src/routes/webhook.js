@@ -19,6 +19,8 @@ router.post(
       logger.info(`Payment succeeded ${paymentIntent.id}`);
 
       try {
+        // throw new Error("TESTING_RETRY: Intentional Webhook Failure");
+
         for (const orderId of orderIds) {
           await purchaseQueue.add(
             "fulfill-order",
@@ -41,11 +43,20 @@ router.post(
         );
 
         const result = await pool.query(
-          "SELECT reservation_id, product_id FROM orders WHERE id = ANY($1::int[])",
+          "SELECT id, reservation_id, product_id, user_id FROM orders WHERE id = ANY($1::int[])",
           [orderIds]
         );
 
-        const userId = req.headers["x-user-id"] || "user-1234";
+        const userIdFromMetadata = paymentIntent.metadata.user_id;
+
+        // Security check: Ensure metadata user_id matches database records
+        const mismatch = result.rows.find(row => row.user_id !== userIdFromMetadata);
+        if (mismatch) {
+          logger.error(`CRITICAL: User ID mismatch in webhook! Stripe: ${userIdFromMetadata}, DB: ${mismatch.user_id} for order ${mismatch.id}`);
+          return res.json({ received: true, warning: "user_mismatch" });
+        }
+
+        const userId = userIdFromMetadata;
         if (result.rows.length > 0) {
           const multi = redisClient.multi();
           const cartKey = redisKey.cartKey(userId);
@@ -66,7 +77,8 @@ router.post(
           logger.info("✅ Redis state successfully cleaned up after purchase.");
         }
       } catch (e) {
-        logger.error(`Failed to queue job: ${e}`);
+        logger.error(`Failed to process webhook for payment ${paymentIntent.id}: ${e}`);
+        return res.status(500).json({ error: "Webhook processing failed. Retry requested." });
       }
     }
 

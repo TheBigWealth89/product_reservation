@@ -92,7 +92,7 @@ router.post("/:id/reserve", reserveLimiter, async (req, res) => {
     const cartEntry = redisKey.cartEntry(id, reservationId);
     const reservationKey = redisKey.reservationKey(id, userId, reservationId);
     const productAmount = result.rows[0].price;
-    const tenMinutesFromNow = new Date(Date.now() + 10000); // 10 seconds for testing
+    const tenMinutesFromNow = new Date(Date.now() + 600000); // 10 minutes (600,000ms)
 
     //Save to DB
     await pool.query(
@@ -100,12 +100,12 @@ router.post("/:id/reserve", reserveLimiter, async (req, res) => {
       [id, userId, tenMinutesFromNow, cartEntry, productAmount]
     );
 
-    // Set Redis reservation key with TTL
-    await redisClient.setex(reservationKey, 10, "reserved"); // 10 seconds for testing
+    // Set Redis reservation key with TTL (10 minutes)
+    await redisClient.setex(reservationKey, 600, "reserved");
 
-    await redisClient.rsadd(cartKey, cartEntry);
+    await redisClient.sadd(cartKey, cartEntry);
     logger.info(
-      `Product ${id} reserved for user ${userId}. Hold expires in 10 seconds.`
+      `Product ${id} reserved for user ${userId}. Hold expires in 10 minutes.`
     );
 
     logger.info(
@@ -117,7 +117,7 @@ router.post("/:id/reserve", reserveLimiter, async (req, res) => {
       inventory: newInventory,
       reservationKey: reservationKey,
       // reservationId: reservationId,
-      expiredAt: tenMinutesFromNow,
+      // expiredAt: tenMinutesFromNow,
     });
   } catch (err) {
     logger.error("Error in reservation:", err);
@@ -195,6 +195,7 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/create-payment-intent", paymentLimiter, async (req, res) => {
+  logger.info("Creating payment intent...");
   const userId = req.user.id;
   const cartKey = redisKey.cartKey(userId);
   let client = null;
@@ -202,13 +203,24 @@ router.post("/create-payment-intent", paymentLimiter, async (req, res) => {
   let compensationClient = null; // Separate client for compensation
 
   try {
+    console.log("User ID from token:", userId);
+
+    console.log("Carrt Key: ", cartKey);
+
+    console.log("Checkout Lua script:", checkoutLuaScript)
     //Validate the cart in Redis
+    logger.info("Starting cart validation.... ")
     const [validatedItems, failedItems] = await redisClient.eval(
       checkoutLuaScript,
       1,
       cartKey,
       userId
     );
+
+    logger.info("Cart validation completed")
+    logger.info(`Validated items: ${JSON.stringify(validatedItems)}`);
+    logger.info(`Failed items: ${JSON.stringify(failedItems)}`);
+
     successfulItems = validatedItems;
 
     if (successfulItems.length === 0) {
@@ -254,7 +266,10 @@ router.post("/create-payment-intent", paymentLimiter, async (req, res) => {
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(totalAmount), // Ensure it's an integer
       currency: "usd",
-      metadata: { order_ids: createOrderIds.join(",") },
+      metadata: {
+        order_ids: createOrderIds.join(","),
+        user_id: userId
+      },
     });
 
     logger.info(`Client secret ${paymentIntent.client_secret}`);

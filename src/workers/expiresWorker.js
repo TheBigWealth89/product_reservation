@@ -1,5 +1,5 @@
 import { pool, redisClient } from "../db/connections.js";
-import returnStock from "../service/inventory.service.js";
+import { returnStock } from "../service/inventory.service.js";
 import logger from "../utils/logger.js";
 import { registerShutdownHandlers } from "../utils/shutdown.js";
 
@@ -68,7 +68,7 @@ class ExpirationCleanup {
   }
 
   start() {
-    logger.info("🔄 Starting expiration cleanup worker (30s interval)");
+    logger.info("Starting expiration cleanup worker (30s interval)");
     this.timer = setInterval(() => this.cleanupExpired(), this.interval);
     this.cleanupExpired(); // Run immediately
   }

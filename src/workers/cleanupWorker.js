@@ -89,8 +89,8 @@ async function processFailedJob(job) {
 async function initialize() {
   await connectAll();
 
-  const schedule = "*/20 * * * * *"; // Every 20 seconds for testing
-  logger.info(`🚀 Cleanup scheduler started. Running every 20 seconds.`);
+  const schedule = "*/10 * * * * *"; // Every 10 seconds for testing
+  logger.info(`🚀 Cleanup scheduler started. Running every 10 seconds.`);
 
   const task = cron.schedule(schedule, runCleanup);
 

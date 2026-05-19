@@ -4,8 +4,13 @@ local cartItems = redis.call('SMEMBERS', cartKey)
 local validItems = {}
 local expiredItems = {}
 
+-- Debug: Log the cart being processed
+redis.log(redis.LOG_NOTICE, "Validating cart for user: " .. userId .. " | Items: " .. #cartItems)
+
 for i, cartItem in ipairs(cartItems) do
-    local productId, reservationId = string.match(cartItem, "^(%d+):rev%-([%w%-]+)$")
+    -- More flexible pattern matching: capture everything before : and everything after rev-
+    local productId, reservationId = string.match(cartItem, "([^:]+):rev%-(.+)")
+    
     if productId and reservationId then
         local reservationKey = 'reservation:product:' .. productId .. ':user-' .. userId .. ':rev-' .. reservationId
         

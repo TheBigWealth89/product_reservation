@@ -1,4 +1,3 @@
-
 services:
   # 1. API Server
   api-server:
@@ -6,6 +5,7 @@ services:
       context: .
       dockerfile: docker/api.Dockerfile
     container_name: prs-api-server
+    command: node --watch src/server.js
     restart: always
     stop_grace_period: 30s
     ports:
@@ -14,6 +14,13 @@ services:
       - .env
     networks:
       - prs-network
+    develop:
+      watch:
+        - path: ./src
+          target: /app/src
+          action: sync
+        - path: ./package.json
+          action: rebuild
 
   # 2. Fulfill Order Worker
   fulfill-order-worker:
@@ -21,13 +28,20 @@ services:
       context: .
       dockerfile: docker/worker.Dockerfile
     container_name: prs-fulfill-worker
-    command: node src/workers/fulfillOrderWorker.js
+    command: node --watch src/workers/fulfillOrderWorker.js
     restart: always
     stop_grace_period: 30s
     env_file:
       - .env
     networks:
       - prs-network
+    develop:
+      watch:
+        - path: ./src
+          target: /app/src
+          action: sync
+        - path: ./package.json
+          action: rebuild
 
   # 3. Expires Worker
   expires-worker:
@@ -35,13 +49,20 @@ services:
       context: .
       dockerfile: docker/worker.Dockerfile
     container_name: prs-expires-worker
-    command: node src/workers/expiresWorker.js
+    command: node --watch src/workers/expiresWorker.js
     restart: always
     stop_grace_period: 30s
     env_file:
       - .env
     networks:
       - prs-network
+    develop:
+      watch:
+        - path: ./src
+          target: /app/src
+          action: sync
+        - path: ./package.json
+          action: rebuild
 
   # 4. Cleanup Worker
   cleanup-worker:
@@ -49,13 +70,20 @@ services:
       context: .
       dockerfile: docker/worker.Dockerfile
     container_name: prs-cleanup-worker
-    command: node src/workers/cleanupWorker.js
+    command: node --watch src/workers/cleanupWorker.js
     restart: always
     stop_grace_period: 30s
     env_file:
       - .env
     networks:
       - prs-network
+    develop:
+      watch:
+        - path: ./src
+          target: /app/src
+          action: sync
+        - path: ./package.json
+          action: rebuild
 
 networks:
   prs-network:

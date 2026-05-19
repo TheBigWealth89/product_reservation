@@ -1,21 +1,23 @@
 import { redisClient, pool } from "./connections.js";
 import logger from "../utils/logger.js";
-import purchaseQueue from "../queues/purchaseQueue.js";
 
-export const syncInventoryToRedis = async () => {
+export const syncInventoryToRedis = async (targetProductId = null) => {
   try {
-    //Fetch all products from postgreSQL
-    const result = await pool.query("SELECT id, inventory FROM products");
+    // Determine which products to sync
+    let query = "SELECT id, inventory FROM products";
+    let params = [];
+    if (targetProductId) {
+      query += " WHERE id = $1";
+      params = [targetProductId];
+    }
+
+    const result = await pool.query(query, params);
     const products = result.rows;
 
-    //Get all jobs currently in the queue (waiting or active)
-    const waitingJobs = await purchaseQueue.getWaiting();
-    const activeJobs = await purchaseQueue.getActive();
-    const completed = await purchaseQueue.getCompleted();
-    const failedJobs = await purchaseQueue.getFailed();
-    logger.info(
-      `Jobs - Waiting: ${waitingJobs.length}, Active: ${activeJobs.length}, Completed: ${completed.length}, Failed: ${failedJobs.length}`
-    );
+    if (products.length === 0 && targetProductId) {
+      logger.warn(`Sync requested for non-existent product ID: ${targetProductId}`);
+      return;
+    }
 
     //Sync each product's inventory to redis
     const multi = redisClient.multi();
@@ -31,9 +33,6 @@ export const syncInventoryToRedis = async () => {
         [product.id]
       );
 
-      console.log("Reservation result: ", reservationResult.rows[0].count);
-
-
       const pendingPayment = await pool.query(
         `SELECT COUNT(*) 
          FROM orders 
@@ -45,15 +44,22 @@ export const syncInventoryToRedis = async () => {
       const activePendingPayment = parseInt(pendingPayment.rows[0].count, 10);
       const activeReservations = parseInt(reservationResult.rows[0].count, 10);
 
-
       // Calculate the true available inventory
       const availableInventory = Math.max(
         0,
         totalInventory - activeReservations - activePendingPayment
       );
-      //  Set this correct value in Redis
+
+      // Set this correct value in Redis
       const key = `inventory:product-${product.id}`;
       multi.set(key, availableInventory);
+
+      // Prepare the update message for real-time UI
+      const updateMessage = JSON.stringify({
+        productId: product.id,
+        newInventory: availableInventory,
+      });
+      multi.publish("inventory-updates", updateMessage);
 
       logger.info(
         `Synced ${key} with available inventory ${availableInventory}`

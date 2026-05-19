@@ -21,11 +21,11 @@ const app = express();
 const httpServer = createServer(app);
 const io = initSockets(httpServer);
 
+app.use(cookieParser());
 // Health routes mounted first — must be reachable before auth and before
 // dependencies are confirmed healthy (readiness probe runs at startup)
 app.use("/", healthRouter);
 
-app.use(cookieParser());
 app.use("/", webhookRouter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

@@ -1,7 +1,7 @@
 import express from "express";
 import purchaseQueue from "../queues/purchaseQueue.js";
 import { pool, connectAll } from "../db/connections.js";
-import returnStock from "../service/inventory.service.js";
+import inventoryService from "../service/inventory.service.js";
 import logger from "../utils/logger.js";
 
 const router = express.Router();
@@ -27,13 +27,15 @@ router.get("/dashboard", async (req, res) => {
     const pageSize = 10;
     const startIdx = (page - 1) * pageSize;
 
-    const [failedJobs, total] = await Promise.all([
+    const [failedJobs, total, productResult] = await Promise.all([
       purchaseQueue.getJobs(["failed"], startIdx, startIdx + pageSize - 1),
       purchaseQueue.getJobCounts(),
+      pool.query("SELECT * FROM products ORDER BY id ASC"),
     ]);
 
     res.render("dashboard", {
       jobs: failedJobs,
+      products: productResult.rows,
       currentPage: page,
       totalPages: Math.ceil(total.failed / pageSize),
       user: req.user,
@@ -43,6 +45,30 @@ router.get("/dashboard", async (req, res) => {
     res.status(500).render("error", {
       message: "Failed to load dashboard",
       error: process.env.NODE_ENV === "development" ? err : null,
+    });
+  }
+});
+
+// Update Inventory
+router.post("/products/:id/inventory", async (req, res) => {
+  try {
+    await initialize();
+    const { id } = req.params;
+    const { inventory } = req.body;
+
+    if (isNaN(inventory) || parseInt(inventory) < 0) {
+      return res.status(400).send("Invalid inventory count");
+    }
+
+    await inventoryService.updateProductInventory(id, parseInt(inventory));
+
+    logger.info(`Admin ${req.user.id} manually set product ${id} inventory to ${inventory}`);
+    res.redirect("/admin/dashboard");
+  } catch (err) {
+    logger.error(`Failed to update product ${id} inventory:`, err);
+    res.status(500).json({
+      error: "Failed to update inventory",
+      details: process.env.NODE_ENV === "development" ? err.message : null,
     });
   }
 });
@@ -88,7 +114,7 @@ router.post("/jobs/:jobId/cancel", async (req, res) => {
     }
 
     const { orderId } = job.data;
-    
+
     client = await pool.connect();
     await client.query("BEGIN");
 
@@ -117,7 +143,7 @@ router.post("/jobs/:jobId/cancel", async (req, res) => {
         );
 
         //Restore inventory
-        await returnStock(product_id);
+        await inventoryService.returnStock(product_id);
       }
     }
 
@@ -129,16 +155,18 @@ router.post("/jobs/:jobId/cancel", async (req, res) => {
 
     res.redirect("/admin/dashboard");
   } catch (err) {
-    await client
-      .query("ROLLBACK")
-      .catch((e) => logger.error("Rollback failed:", e));
+    if (client) {
+      await client
+        .query("ROLLBACK")
+        .catch((e) => logger.error("Rollback failed:", e));
+    }
     logger.error(`Failed to cancel job ${jobId}:`, err);
     res.status(500).json({
       error: "Failed to cancel job",
       details: process.env.NODE_ENV === "development" ? err.message : null,
     });
   } finally {
-    client.release();
+    if (client) client.release();
   }
 });
 
