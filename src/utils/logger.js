@@ -28,11 +28,13 @@ winston.addColors(colors);
 const SENSITIVE_KEYS = ["password", "token", "secret", "stripe_secret_key", "session_secret", "authorization", "cookie"];
 const STRIPE_REGEX = /(sk_test|sk_live)_[0-9a-zA-Z]+/g;
 const BEARER_REGEX = /Bearer\s+[A-Za-z0-9\-\._~\+\/]+=*/g;
+const REDIS_URL_REGEX = /(rediss?:\/\/[^:]*:)([^@]+)(@)/g;
 
 const redactSecrets = winston.format((info) => {
   if (typeof info.message === 'string') {
     info.message = info.message.replace(STRIPE_REGEX, '[STRIPE_KEY_REDACTED]');
     info.message = info.message.replace(BEARER_REGEX, 'Bearer [TOKEN_REDACTED]');
+    info.message = info.message.replace(REDIS_URL_REGEX, '$1[REDIS_PASSWORD_REDACTED]$3');
   }
 
   const scrubObject = (obj) => {
