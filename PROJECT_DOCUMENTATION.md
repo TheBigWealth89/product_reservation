@@ -445,22 +445,24 @@ sequenceDiagram
 
 ## 12. Development Workflow
 
-### Docker Compose Watch
-For a real-time development experience where changes to your `src/` directory are instantly synced into the containers:
+### Isolated Local Environment (Docker Compose)
+We maintain a separate Docker Compose file for local development (`docker-compose.local.yml`) that spins up isolated instances of **PostgreSQL** (via Timescale image to prevent pull issues) and **Redis**, alongside all API and Worker containers.
+- **Why?** It guarantees you won't accidentally overwrite production data (Render/RedisLabs) and avoids cloud latency/rate limits during testing.
+- **Usage**:
+  ```bash
+  # Start the fully local system with hot-reloading (volumes mapped to ./src)
+  docker compose -f docker-compose.local.yml up
+  ```
+  *(Note: This uses `.env.local` to point the services to the local DB/Redis containers).*
 
+### Original Cloud-Connected Compose
+For connecting to the cloud databases while running the app locally, use the default configuration:
 ```bash
 # Start the system with hot-reloading
 docker compose up --watch
 ```
 
 This configuration uses the native Node.js `--watch` flag inside the containers to restart the internal processes without killing the container itself, making development much faster and more stable.
-
-### System Reset
-To clear all data and start as "fresh" (deletes all orders and flushes Redis):
-
-```bash
-node clear-system.js
-```
 
 ### Environment Variables
 
