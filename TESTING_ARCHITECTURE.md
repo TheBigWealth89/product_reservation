@@ -19,12 +19,12 @@ The project uses a highly isolated, containerized testing strategy to avoid data
 *   **`tests/setup/testHelpers.js`**: Manages lazy connection pooling per Vitest worker. Provides reusable utilities for tests like `loginAs()`, `seedProduct()`, `seedOrder()`, and Redis query wrappers.
 
 ### Executing Tests
-We've added specific scripts to `package.json` for running tests:
+We've added specific scripts to `package.json` for running tests. The Docker container lifecycle is handled automatically via Vitest's `globalSetup` and `globalTeardown`, spinning up and tearing down isolated databases strictly when needed.
 
-*   **`npm run test:docker`**: **(Recommended)** Runs the entire test suite inside isolated Docker containers. It spins up Postgres/Redis, waits for them to become healthy using `--wait`, and then runs the Vitest suite sequentially. Note: You must manually run `docker compose -f docker-compose.test.yml down -v` to tear down containers when completely finished.
-*   **`npm run test:unit`**: Runs only the fast unit tests without requiring any Docker containers or database connections.
-*   **`npm run test:integration`**: Runs the integration suite (requires DB/Redis to be running locally or via Docker).
-*   **`npm run test:e2e`**: Runs the end-to-end worker tests (requires DB/Redis to be running).
+*   **`npm test`**: **(Recommended)** Runs the entire test suite. Automatically starts Postgres/Redis via Docker Compose, runs all tests, and gracefully destroys the containers afterward.
+*   **`npm run test:unit`**: Runs only the fast unit tests. Automatically bypasses Docker setup.
+*   **`npm run test:integration`**: Runs the integration suite. Automatically handles Docker setup and teardown.
+*   **`npm run test:e2e`**: Runs the end-to-end worker tests. Automatically handles Docker setup and teardown.
 
 ---
 
@@ -91,9 +91,9 @@ The tests are organized into `unit`, `integration`, and `e2e` layers based on th
 
 During the evolution of this test suite, several architectural lessons were learned regarding testing distributed systems:
 
-1.  **Docker Container Timing (`ECONNREFUSED` / Auth Failures):**
-    *   **Issue:** Tests would crash on startup because Vitest's `globalSetup` executed before the Postgres container was fully ready to accept connections.
-    *   **Resolution:** Modified `npm run test:docker` to include `docker compose up -d --wait`, ensuring test execution halts until Docker's internal `healthcheck` scripts for Postgres/Redis report a `Healthy` status.
+1.  **Docker Container Timing & Lifecycle Management:**
+    *   **Issue:** Tests would crash on startup because Vitest's `globalSetup` executed before the Postgres container was fully ready to accept connections. We also had orphaned containers if developers forgot to tear them down.
+    *   **Resolution:** Moved Docker orchestration directly into Vitest's `globalSetup.js` and `globalTeardown.js` using `child_process.execSync`. Added the `--wait` flag so test execution halts until Docker's internal `healthcheck` scripts report a `Healthy` status. Containers are automatically destroyed post-test via `down -v`.
 
 2.  **Vitest Parallelism & Shared Database State:**
     *   **Issue:** Integration tests failed randomly (Flaky Tests) because multiple test files were executing `TRUNCATE orders CASCADE` concurrently, deleting records while other tests were running assertions.

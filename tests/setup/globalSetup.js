@@ -11,6 +11,7 @@ import Redis from "ioredis";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { execSync } from "child_process";
 import dotenv from "dotenv";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -29,6 +30,9 @@ export async function setup() {
   }
 
   try {
+    console.log("[globalSetup] 🐳 Starting Docker containers...");
+    execSync("docker compose -f docker-compose.test.yml up -d --wait", { stdio: "inherit" });
+
     // Connect to postgres-test
     const pool = new pg.Pool({
       host: process.env.DB_HOST || "localhost",
@@ -76,5 +80,14 @@ export async function setup() {
 }
 
 export async function teardown() {
+  const isUnitOnly = process.argv.some((arg) => arg.includes("tests/unit"));
+  if (!isUnitOnly) {
+    console.log("[globalTeardown] 🐳 Tearing down Docker containers...");
+    try {
+      execSync("docker compose -f docker-compose.test.yml down -v", { stdio: "inherit" });
+    } catch (err) {
+      console.error("[globalTeardown] ⚠️ Failed to teardown Docker containers:", err.message);
+    }
+  }
   console.log("[globalTeardown] ✅ Global teardown complete");
 }

@@ -16,8 +16,7 @@
     "test:integration": "cross-env NODE_ENV=test vitest run tests/integration",
     "test:e2e": "cross-env NODE_ENV=test vitest run tests/e2e",
     "test:coverage": "cross-env NODE_ENV=test vitest run --coverage",
-    "test:watch": "cross-env NODE_ENV=test vitest",
-    "test:docker": "docker compose -f docker-compose.test.yml up -d --wait && cross-env NODE_ENV=test vitest run"
+    "test:watch": "cross-env NODE_ENV=test vitest"
   },
   "type": "module",
   "keywords": [],
