@@ -1,7 +1,7 @@
 import { pool, redisClient } from "../db/connections.js";
-import { returnStock } from "../service/inventory.service.js";
 import logger from "../utils/logger.js";
 import { registerShutdownHandlers } from "../utils/shutdown.js";
+import { expiryProcessor } from "./processors/expiry.processor.js";
 
 class ExpirationCleanup {
   constructor() {
@@ -20,49 +20,9 @@ class ExpirationCleanup {
   }
 
   async _doCleanup() {
-    const client = await pool.connect();
-
     try {
-      await client.query("BEGIN");
-      // Find expired reservations
-      const expired = await client.query(`
-        SELECT * FROM orders 
-        WHERE expires_at < NOW() 
-        AND status = 'reserved'
-        FOR UPDATE SKIP LOCKED
-      `);
-      for (const reservation of expired.rows) {
-        try {
-          // Update status
-          await client.query(
-            `UPDATE orders SET status = 'expired' WHERE id = $1`,
-            [reservation.id]
-          );
-
-          // Restore inventory
-          await returnStock(reservation.product_id);
-
-          // Remove from cart
-          await redisClient.srem(
-            `cart:user-${reservation.user_id}`,
-            reservation.reservation_id
-          );
-
-          logger.info(
-            `Cleaned expired reservation: ${reservation.reservation_id}`
-          );
-        } catch (err) {
-          logger.error(`Failed to clean reservation ${reservation.id}:`, err);
-          // Continue with other reservations
-        }
-      }
-
-      await client.query("COMMIT");
-    } catch (err) {
-      await client.query("ROLLBACK");
-      logger.error("Cleanup transaction failed:", err);
+      await expiryProcessor();
     } finally {
-      client.release();
       this.isRunning = false;
     }
   }

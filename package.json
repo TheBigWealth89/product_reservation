@@ -11,7 +11,13 @@
     "dev:expiresWorker": "cross-env NODE_ENV=development node src/workers/expiresWorker.js",
     "dev:fulfillOrderWorker": "cross-env NODE_ENV=development node src/workers/fulfillOrderWorker.js",
     "dev:cleanupWorker": "cross-env NODE_ENV=development node src/workers/cleanupWorker.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "cross-env NODE_ENV=test vitest run",
+    "test:unit": "cross-env NODE_ENV=test vitest run tests/unit",
+    "test:integration": "cross-env NODE_ENV=test vitest run tests/integration",
+    "test:e2e": "cross-env NODE_ENV=test vitest run tests/e2e",
+    "test:coverage": "cross-env NODE_ENV=test vitest run --coverage",
+    "test:watch": "cross-env NODE_ENV=test vitest",
+    "test:docker": "docker compose -f docker-compose.test.yml up -d --wait && cross-env NODE_ENV=test vitest run"
   },
   "type": "module",
   "keywords": [],
@@ -36,8 +42,11 @@
     "winston": "^3.17.0"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.6",
     "cross-env": "^10.0.0",
     "node-fetch": "^3.3.2",
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.1.10",
+    "supertest": "^7.2.2",
+    "vitest": "^4.1.6"
   }
 }

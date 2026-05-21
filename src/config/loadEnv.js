@@ -7,4 +7,9 @@ const __dirname = path.dirname(__filename);
 
 // Always load .env from project root
 const rootPath = path.join(__dirname, "../../");
-dotenv.config({ path: path.join(rootPath, ".env") });
+
+if (process.env.NODE_ENV === "test") {
+  dotenv.config({ path: path.join(rootPath, ".env.test") });
+} else {
+  dotenv.config({ path: path.join(rootPath, ".env") });
+}
