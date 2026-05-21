@@ -21,14 +21,14 @@ const io = initSockets(httpServer);
     try {
       await syncInventoryToRedis();
     } catch (syncErr) {
-      logger.error("⚠️ Sync failed at startup; continuing to boot:", syncErr);
+      logger.error("Sync failed at startup; continuing to boot:", syncErr);
     }
 
     httpServer.listen(port, () => {
-      logger.info(`🚀 Server with Socket.IO running on http://localhost:${port}`);
+      logger.info(`Server with Socket.IO running on http://localhost:${port}`);
     });
   } catch (err) {
-    logger.error("💥 Failed to start server:", err);
+    logger.error("Failed to start server:", err);
     process.exit(1);
   }
 })();

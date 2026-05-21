@@ -10,9 +10,6 @@ import {
   getRequest,
   seedProduct,
   seedOrder,
-  clearRedisKeys,
-  getRedisValue,
-  getRedisSet,
   closeConnections,
 } from "../setup/testHelpers.js";
 

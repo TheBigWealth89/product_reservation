@@ -24,7 +24,7 @@ export async function setup() {
   const isUnitOnly = process.argv.some((arg) => arg.includes("tests/unit"));
 
   if (isUnitOnly) {
-    console.log("[globalSetup] ⏭️  Unit-only run detected — skipping DB/Redis setup");
+    console.log("[globalSetup] ⏭ Unit-only run detected — skipping DB/Redis setup");
     return;
   }
 

@@ -11,7 +11,6 @@ import {
   seedOrder,
   getRedisValue,
   getRedisSet,
-  clearRedisKeys,
   closeConnections,
 } from "../setup/testHelpers.js";
 import { expiryProcessor } from "../../src/workers/processors/expiry.processor.js";
