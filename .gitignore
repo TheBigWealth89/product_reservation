@@ -5,3 +5,5 @@ node_modules
 logs
 clear-system.js
 inspect-redis.js
+test_concurrency.sh
+load-test.yml

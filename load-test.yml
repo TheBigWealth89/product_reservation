@@ -5,5 +5,5 @@ config:
       arrivalCount: 20 # Simulate 20 users trying to reserve in 1 seconds
 scenarios:
   - flow:
-      - post:
+      - post:load-test.yml
           url: "/product/1/reserve" # Make sure '1' is the ID of your test product
