@@ -1,0 +1,178 @@
+# Render Blueprint Configuration (Render's equivalent to Docker Compose)
+# To deploy: Go to Render Dashboard -> New -> Blueprint -> Select this Repository.
+
+databases:
+  - name: prs-postgres
+    databaseName: prs_db
+    user: prs_user
+    plan: free
+
+redis:
+  - name: prs-redis
+    plan: free
+    ipAllowList: [] # Allow all internal services to connect
+
+services:
+  # ── 1. API Server (Web Service) ─────────────────────────────
+  - type: web
+    name: prs-api-server
+    env: docker
+    dockerfilePath: docker/api.Dockerfile
+    plan: free
+    startCommand: node src/server.js
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: NODE_ENV
+        value: production
+      - key: DB_HOST
+        fromDatabase:
+          name: prs-postgres
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: prs-postgres
+          property: port
+      - key: DB_USER
+        fromDatabase:
+          name: prs-postgres
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: prs-postgres
+          property: password
+      - key: DB_NAME
+        fromDatabase:
+          name: prs-postgres
+          property: database
+      - key: DB_SSL
+        value: "true"
+      - key: REDIS_URL
+        fromRedis:
+          name: prs-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true # Render will generate a cryptographically secure random secret
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASS
+        sync: false # You will enter this in the Render Dashboard
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false # You will enter this
+      - key: STRIPE_SECRET_KEY
+        sync: false # You will enter this
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false # You will enter this
+
+  # ── 2. Fulfill Order Worker (Background Worker) ──────────────
+  - type: worker
+    name: prs-fulfill-worker
+    env: docker
+    dockerfilePath: docker/worker.Dockerfile
+    dockerCommand: node src/workers/fulfillOrderWorker.js
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DB_HOST
+        fromDatabase:
+          name: prs-postgres
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: prs-postgres
+          property: port
+      - key: DB_USER
+        fromDatabase:
+          name: prs-postgres
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: prs-postgres
+          property: password
+      - key: DB_NAME
+        fromDatabase:
+          name: prs-postgres
+          property: database
+      - key: DB_SSL
+        value: "true"
+      - key: REDIS_URL
+        fromRedis:
+          name: prs-redis
+          property: connectionString
+      - key: STRIPE_SECRET_KEY
+        sync: false # Shared with web service
+
+  # ── 3. Expires Worker (Background Worker) ───────────────────
+  - type: worker
+    name: prs-expires-worker
+    env: docker
+    dockerfilePath: docker/worker.Dockerfile
+    dockerCommand: node src/workers/expiresWorker.js
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DB_HOST
+        fromDatabase:
+          name: prs-postgres
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: prs-postgres
+          property: port
+      - key: DB_USER
+        fromDatabase:
+          name: prs-postgres
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: prs-postgres
+          property: password
+      - key: DB_NAME
+        fromDatabase:
+          name: prs-postgres
+          property: database
+      - key: DB_SSL
+        value: "true"
+      - key: REDIS_URL
+        fromRedis:
+          name: prs-redis
+          property: connectionString
+
+  # ── 4. Cleanup Worker (Background Worker) ───────────────────
+  - type: worker
+    name: prs-cleanup-worker
+    env: docker
+    dockerfilePath: docker/worker.Dockerfile
+    dockerCommand: node src/workers/cleanupWorker.js
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DB_HOST
+        fromDatabase:
+          name: prs-postgres
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: prs-postgres
+          property: port
+      - key: DB_USER
+        fromDatabase:
+          name: prs-postgres
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: prs-postgres
+          property: password
+      - key: DB_NAME
+        fromDatabase:
+          name: prs-postgres
+          property: database
+      - key: DB_SSL
+        value: "true"
+      - key: REDIS_URL
+        fromRedis:
+          name: prs-redis
+          property: connectionString
