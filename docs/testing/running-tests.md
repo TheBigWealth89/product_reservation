@@ -74,7 +74,7 @@ docker compose -f docker-compose.test.yml down -v
 ```yaml
 services:
   postgres-test:
-    image: timescale/timescaledb:latest-pg15
+    image: postgres:15-alpine
     pull_policy: missing            # Never pull if image already exists locally
     tmpfs:
       - /var/lib/postgresql/data    # RAM storage — fast + auto-wiped on stop

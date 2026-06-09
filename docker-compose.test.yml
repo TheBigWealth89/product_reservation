@@ -1,6 +1,6 @@
 services:
   postgres-test:
-    image: timescale/timescaledb:latest-pg15
+    image: postgres:15-alpine
     pull_policy: missing
     tmpfs:
       - /var/lib/postgresql/data

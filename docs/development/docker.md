@@ -53,7 +53,7 @@ docker compose up --watch
 
 | Container | Image | Port Exposed to Host | Notes |
 |---|---|---|---|
-| `prs-local-postgres` | `timescale/timescaledb:latest-pg15` | `5433:5432` | Volume-backed; schema auto-loaded from `./sql/init.sql` |
+| `prs-local-postgres` | `postgres:15-alpine` | `5433:5432` | Volume-backed; schema auto-loaded from `./sql/init.sql` |
 | `prs-local-redis` | `redis:7-alpine` | `6379:6379` | Volume-backed |
 | `prs-local-api-server` | `docker/api.Dockerfile` | `3000:3000` | `--watch` mode; `./src` synced into container |
 | `prs-local-fulfill-worker` | `docker/worker.Dockerfile` | None | `--watch` mode |
@@ -104,7 +104,7 @@ Application containers declare `depends_on` with `condition: service_healthy` so
 
 | Container | Image | Port Exposed to Host | Notes |
 |---|---|---|---|
-| `postgres-test` | `timescale/timescaledb:latest-pg15` | `5434:5432` | tmpfs storage — no data persistence |
+| `postgres-test` | `postgres:15-alpine` | `5434:5432` | tmpfs storage — no data persistence |
 | `redis-test` | `redis:7-alpine` | `6380:6379` | tmpfs storage — no data persistence |
 
 **No API server or worker containers** — the test suite imports the Express app directly via `supertest` and calls processor functions directly, with no live processes required.
