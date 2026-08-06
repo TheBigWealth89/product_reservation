@@ -13,7 +13,7 @@ The real-time layer has two sides:
 1. **Socket.IO** — browser-to-server persistent connection. Clients join a room per product and receive push events.
 2. **Redis Pub/Sub** — process-to-process messaging. Any process that changes inventory publishes to a channel; the API server's subscriber forwards messages into Socket.IO rooms.
 
-This two-layer design means workers (which run as separate processes with no access to the Socket.IO server object) can still trigger real-time browser updates by publishing to Redis.
+This two-layer design means workers (which run as separate processes with no access to the Socket.IO server object) can still trigger real-time browser updates by publishing to Redis. 
 
 ---
 
@@ -81,7 +81,7 @@ socket.on("inventory-update", ({ newInventory }) => {
 | Message format | JSON string |
 | Publishers | `inventory.service.js`, `routes/products.js` |
 | Subscriber | `src/sockets/index.js` |
-
+c
 **Message format**:
 ```json
 { "productId": "1", "newInventory": 4 }
