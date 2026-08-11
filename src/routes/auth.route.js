@@ -31,7 +31,7 @@ authRoute.post("/login", (req, res) => {
     if (user.role === "admin") {
       res.redirect("/admin/dashboard");
     } else {
-      res.redirect("/product");
+      res.redirect("/product/1");
     }
   } else {
     res.render("login", { error: "Invalid credentials" });
