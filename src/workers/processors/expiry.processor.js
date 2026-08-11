@@ -1,5 +1,6 @@
 import { pool, redisClient } from "../../db/connections.js";
 import { returnStock } from "../../service/inventory.service.js";
+import { redisKey } from "../../utils/redisKeys.js";
 import logger from "../../utils/logger.js";
 
 /**
@@ -7,6 +8,7 @@ import logger from "../../utils/logger.js";
  * Finds expired 'reserved' orders and marks them expired,
  * restores stock, and removes cart entries.
  */
+
 export async function expiryProcessor() {
   const client = await pool.connect();
 
@@ -30,11 +32,23 @@ export async function expiryProcessor() {
         // Restore inventory
         await returnStock(reservation.product_id);
 
+        // Parse the uuid from "productId:rev-uuid" stored as reservation_id in DB
+        const uuid = reservation.reservation_id.split("rev-")[1];
+        const reservationKeyToDelete = redisKey.reservationKey(
+          reservation.product_id,
+          reservation.user_id,
+          uuid
+        );
+
         // Remove from cart
         await redisClient.srem(
-          `cart:user-${reservation.user_id}`,
+          redisKey.cartKey(reservation.user_id),
           reservation.reservation_id
         );
+
+        // Explicitly delete the TTL reservation key so validate_cart.lua
+        // cannot treat this as a valid reservation even before its TTL fires.
+        await redisClient.del(reservationKeyToDelete);
 
         logger.info(
           `Cleaned expired reservation: ${reservation.reservation_id}`

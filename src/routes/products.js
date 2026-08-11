@@ -1,7 +1,7 @@
 import "../config/loadEnv.js";
 import { redisKey } from "../utils/redisKeys.js";
 import express from "express";
-import Stripe from "stripe";
+import stripe from "../config/stripe.js";
 import { redisClient, pool } from "../db/connections.js";
 import logger from "../utils/logger.js";
 import { v4 as uuidv4 } from "uuid";
@@ -13,9 +13,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const router = express.Router();
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_placeholder", {
-  apiVersion: "2025-08-27.basil",
-});
 
 // Load the Lua script text when the module loads
 const reserveLuaScript = fs.readFileSync(
@@ -203,11 +200,7 @@ router.post("/create-payment-intent", paymentLimiter, async (req, res) => {
   let compensationClient = null; // Separate client for compensation
 
   try {
-    console.log("User ID from token:", userId);
 
-    console.log("Carrt Key: ", cartKey);
-
-    console.log("Checkout Lua script:", checkoutLuaScript)
     //Validate the cart in Redis
     logger.info("Starting cart validation.... ")
     const [validatedItems, failedItems] = await redisClient.eval(

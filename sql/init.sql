@@ -17,7 +17,7 @@ CREATE TABLE orders (
     id SERIAL PRIMARY KEY,
     reservation_id VARCHAR(255) UNIQUE NOT NULL,
     user_id VARCHAR(255) NOT NULL,
-    product_id INTEGER NOT NULL,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
     status VARCHAR(50) DEFAULT 'reserved', -- e.g., 'pending', 'paid', 'failed'
     stripe_payment_intent_id VARCHAR(255),
     amount NUMERIC(10, 2) NOT NULL,
