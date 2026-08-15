@@ -1,3 +1,4 @@
+// redisClient is passed to registerShutdownHandlers for graceful connection teardown
 import { pool, redisClient } from "../db/connections.js";
 import logger from "../utils/logger.js";
 import { registerShutdownHandlers } from "../utils/shutdown.js";

@@ -48,5 +48,5 @@ export const updateProductInventory = async (productId, newCount) => {
 export default {
   returnStock,
   updateProductInventory,
-  syncInventoryToRedis,
 };
+

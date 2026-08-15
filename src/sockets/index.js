@@ -14,8 +14,8 @@ export const initSockets = (httpServer) => {
       logger.info(`Socket ${socket.id} joined room for product ${productId}`);
     });
 
-    io.on("disconnect", (reason) => {
-      logger.error(`User disconnected ${reason}`);
+    socket.on("disconnect", (reason) => {
+      logger.info(`User disconnected socket ${socket.id}: ${reason}`);
     });
   });
 

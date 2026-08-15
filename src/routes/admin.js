@@ -1,25 +1,12 @@
 import express from "express";
 import purchaseQueue from "../queues/purchaseQueue.js";
-import { pool, connectAll } from "../db/connections.js";
+import { pool } from "../db/connections.js";
 import inventoryService from "../service/inventory.service.js";
 import logger from "../utils/logger.js";
 
 const router = express.Router();
 
-//connection state tracking
-let isInitialized = false;
-async function initialize() {
-  if (isInitialized) return;
 
-  try {
-    await connectAll();
-    isInitialized = true;
-    logger.info("Admin routes initialized successfully");
-  } catch (err) {
-    logger.error("Failed to initialize admin routes:", err);
-    throw err;
-  }
-}
 // Dashboard route with pagination
 router.get("/dashboard", async (req, res) => {
   try {
@@ -52,7 +39,6 @@ router.get("/dashboard", async (req, res) => {
 // Update Inventory
 router.post("/products/:id/inventory", async (req, res) => {
   try {
-    await initialize();
     const { id } = req.params;
     const { inventory } = req.body;
 
@@ -76,7 +62,6 @@ router.post("/products/:id/inventory", async (req, res) => {
 // Retry job
 router.post("/jobs/:jobId/retry", async (req, res) => {
   try {
-    await initialize();
 
     const { jobId } = req.params;
     const job = await purchaseQueue.getJob(jobId);
@@ -104,7 +89,6 @@ router.post("/jobs/:jobId/cancel", async (req, res) => {
   const { jobId } = req.params;
   let client;
   try {
-    await initialize();
 
     logger.info(`Job id ${jobId}`);
     const job = await purchaseQueue.getJob(jobId);
