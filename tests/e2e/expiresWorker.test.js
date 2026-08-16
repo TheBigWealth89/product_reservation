@@ -114,4 +114,30 @@ describe("Expiry Processor (Path F)", () => {
     const isMember = await redis.sismember("cart:user-user-cart-test", reservationId);
     expect(isMember).toBe(0);
   });
+
+  test("reservation TTL key is explicitly deleted in Redis after expiry", async () => {
+    const pastDate = new Date(Date.now() - 3600000);
+    const uuid = "del-test-123";
+    const reservationId = `${product.id}:rev-${uuid}`;
+    const userId = "user-del-test";
+    const reservationKey = `reservation:product:${product.id}:user-${userId}:rev-${uuid}`;
+
+    await seedOrder({
+      product_id: product.id,
+      user_id: userId,
+      status: "reserved",
+      reservation_id: reservationId,
+      expires_at: pastDate,
+    });
+
+    // Set reservation key in Redis
+    await redis.setex(reservationKey, 600, "reserved");
+    expect(await redis.exists(reservationKey)).toBe(1);
+
+    await expiryProcessor();
+
+    // Verify reservation key was explicitly deleted in Redis
+    expect(await redis.exists(reservationKey)).toBe(0);
+  });
 });
+

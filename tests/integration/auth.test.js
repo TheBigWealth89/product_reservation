@@ -22,7 +22,7 @@ describe("Authentication & RBAC (Path G)", () => {
       .send({ username: "alice", password: "pass123" })
       .expect(302);
 
-    expect(res.headers.location).toBe("/product");
+    expect(res.headers.location).toBe("/product/1");
     const cookies = res.headers["set-cookie"];
     expect(cookies).toBeDefined();
     const tokenCookie = Array.isArray(cookies)

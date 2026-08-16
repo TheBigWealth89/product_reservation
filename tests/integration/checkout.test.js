@@ -109,4 +109,43 @@ describe("Checkout & Payment Intent (Path C)", () => {
     // The route renders orderPage with empty cart for GET, but POST should fail
     expect([400, 500, 429]).toContain(res.status);
   });
+
+  test("stripe API error triggers compensation: reverts order status back from payment_pending to reserved", async () => {
+    // 1. Create a reservation first
+    await request
+      .post(`/product/${product.id}/reserve`)
+      .set("Cookie", customerCookie)
+      .expect(200);
+
+    // Verify order starts as 'reserved'
+    const initialOrder = await pool.query(
+      "SELECT id, status FROM orders WHERE product_id = $1 AND user_id = 'user-alice'",
+      [product.id]
+    );
+    expect(initialOrder.rows[0].status).toBe("reserved");
+
+    // 2. Mock stripe.paymentIntents.create to throw an error
+    const stripeConfig = await import("../../src/config/stripe.js");
+    const createSpy = vi
+      .spyOn(stripeConfig.default.paymentIntents, "create")
+      .mockRejectedValueOnce(new Error("Stripe API Timeout Error"));
+
+    // 3. Attempt payment intent creation
+    const res = await request
+      .post("/product/create-payment-intent")
+      .set("Cookie", customerCookie);
+
+    expect(res.status).toBe(500);
+    expect(res.body.error).toBe("Failed to process payment.");
+
+    // 4. DB Check: Compensation must have reverted order status back to 'reserved'
+    const finalOrder = await pool.query(
+      "SELECT status FROM orders WHERE id = $1",
+      [initialOrder.rows[0].id]
+    );
+    expect(finalOrder.rows[0].status).toBe("reserved");
+
+    createSpy.mockRestore();
+  });
 });
+

@@ -84,6 +84,15 @@ The `/health` route is explicitly excluded from rate limiting so that load-balan
 
 **Why this approach**: This is a compensating transaction — rolling back a business-level state change when a downstream operation fails. The alternative (leaving the order in `payment_pending` and letting it time out via the cleanup worker) would require the cleanup worker to also handle the revert logic, and the stock would be locked for the full cleanup interval rather than immediately recoverable.
 
+### Future Improvement: Capped Grace Period Extension Pattern
+
+If a user attempts payment in the final seconds of their 10-minute hold window (e.g. at 09:50) and experiences a payment failure (e.g. CVC typo, 3D-Secure bank timeout), the compensation logic currently reverts `status` to `reserved` without extending `expires_at`. As a result, the original hold deadline (10:00) has already passed, so the `expiryProcessor` immediately reclaims the stock on its next 30-second cycle, forcing the user to reserve/add to cart again.
+
+A proposed UX enhancement for future implementation is the **Capped Grace Period Extension**:
+- **Mechanism**: When compensation executes, if `expires_at` is near or past `NOW()`, grant a single 2-minute extension: `expires_at = GREATEST(expires_at, NOW() + INTERVAL '2 minutes')`.
+- **Bot Protection (Max Total Cap)**: Enforce a hard maximum hold cap (e.g., `MAX(created_at + 12 minutes)`) so malicious scripts cannot repeatedly trigger payment failures to lock up limited inventory indefinitely.
+- **Dual-DB Synchronization**: When extending PostgreSQL `expires_at`, also execute `EXPIRE reservationKey 120` in Redis to ensure `validate_cart.lua` and Redis TTL remain synchronized with PostgreSQL.
+
 ---
 
 ## Distributed Locking — Redis `SET NX EX`
