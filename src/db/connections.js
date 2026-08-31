@@ -15,7 +15,7 @@ export const pool = new Pool({
   idleTimeoutMillis: 30000, // close idle clients after 30 seconds
   connectionTimeoutMillis: 10000, // return an error after 10 seconds if connection could not be established
 });
-
+// re
 // --- Redis Connection ---
 const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
 export const redisClient = new Redis(redisUrl, {
