@@ -42,7 +42,7 @@ sequenceDiagram
     API->>R: DEL reservation keys, SREM cart
 
     W->>R: Pull job from queue
-    W->>PG: BEGIN; SELECT FOR UPDATE; UPDATE products; UPDATE orders status='completed'; COMMIT
+    W->>PG: BEGIN, SELECT FOR UPDATE, UPDATE products, UPDATE orders status='completed', COMMIT
 ```
 
 ---
