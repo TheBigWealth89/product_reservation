@@ -3,21 +3,22 @@ import jwt from "jsonwebtoken";
 
 const authRoute = Router();
 
-// TODO: replace with database user lookup when real auth is implemented
-const MOCK_USERS = {
-  alice: { password: "pass123", id: "user-alice", role: "customer" },
-  admin: { password: "adminpass", id: "admin-1", role: "admin" },
-};
-
 authRoute.get("/login", (req, res) => {
   res.render("login", { error: null });
 });
 
 authRoute.post("/login", (req, res) => {
   const { username, password } = req.body;
-  const user = MOCK_USERS[username];
 
-  if (user && user.password === password) {
+  let user = null;
+  // TODO: replace with database user lookup when real auth is implemented
+  if (username === process.env.ADMIN_USERNAME && password === process.env.ADMIN_PASS) {
+    user = { id: "admin-1", role: "admin" };
+  } else if (username === process.env.CUSTOMER_USERNAME && password === process.env.CUSTOMER_PASS) {
+    user = { id: "user-alice", role: "customer" };
+  }
+
+  if (user) {
     const payload = { sub: user.id, role: user.role };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "24h" });
 
